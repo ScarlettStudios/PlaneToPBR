@@ -15,11 +15,11 @@
 2. Open Blender and navigate to `Edit` > `Preferences`.
 3. In the Preferences window, click on the `Add-ons` tab and select `Install...`.
 
-![Install Add-on](Screenshots/install.png)
+![Install Add-on](assets/install.png)
 
 4. Navigate to the location where you downloaded the `PlanetoPBR.py` file, select it, and click `Install Add-on`.
 
-![Python Script](Screenshots/py.png)
+![Python Script](assets/py.png)
 
 5. Ensure the add-on is enabled by checking the box next to its name.
 
@@ -35,16 +35,16 @@
 ### Step 2: Generate Texture Maps
 - **Window Mask**: Use [Grounded Segment Anything](https://huggingface.co/spaces/yizhangliu/Grounded-Segment-Anything) to generate a black-and-white window mask. This AI tool allows you to segment and detect objects with custom prompts.
 
-![Window Mask](Screenshots/segment.png)
+![Window Mask](assets/segment.png)
 
 - **Depth Map**: Generate a depth map using the [Marigold tool](https://huggingface.co/spaces/prs-eth/marigold) on Hugging Face. Adjust the ensemble size to 20 for maximum detail.
 
-![Depth Map](Screenshots/marigold.png)
+![Depth Map](assets/marigold.png)
 
 - **Normal Map**: Create a normal map using [Smart Normal](https://www.smart-page.net/smartnormal/). This free online tool converts your images into detailed normal maps.
 - **Roughness Map**: Generate a roughness map using [Photo-Kako](https://www.photo-kako.com/en/hpf/). Adjust depth settings to around 3 for optimal results.
 
-![Roughness Map](Screenshots/roughness.png)
+![Roughness Map](assets/roughness.png)
 
 ### Step 3: Organize Your Files
 - Place all generated texture maps in a folder named “Textures.”
@@ -54,11 +54,11 @@
 1. With the add-on enabled, go to the 3D Viewport in Blender.
 2. Press `Shift+A` to add a new object and select `Image` > `Import Plane from Image`.
 
-![Import Plane from Image](Screenshots/import.png)
+![Import Plane from Image](assets/import.png)
 
 3. Navigate to your “Textures” folder and select all the texture files.
 
-![Importing Textures](Screenshots/importtextures.png)
+![Importing Textures](assets/importtextures.png)
 
 4. The script will automatically apply the textures to your model.
 
@@ -71,7 +71,7 @@ If you use ComfyUI and want to get the depth, normal, roughness, and mask all in
 ![ComfyUI-PBR+mask](PlaneToPBR/ComfyUI-PBR+mask.png)
 - Use the Modifiers Editor to fine-tune subdivisions and displacement scale as needed.
 
-![Modifiers Settings](Screenshots/modifiers.png)
+![Modifiers Settings](assets/modifiers.png)
 
 
 ## ComfyUI

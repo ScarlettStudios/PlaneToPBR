@@ -5,11 +5,8 @@ bl_info = {
 }
 
 import bpy
-print("PLANETOPBR __init__.py IMPORTED")
 
-
-# Import ONLY lifecycle-facing symbols
-from .PlanetoPBR import (
+from .operators import (
     OBJECT_OT_import_plane_from_image,
     menu_func,
 )

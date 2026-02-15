@@ -1,0 +1,116 @@
+import os
+import sys
+
+# Add repo root (parent of PlaneToPBR/) to sys.path
+HERE = os.path.dirname(__file__)
+REPO_ROOT = os.path.abspath(os.path.join(HERE, ".."))
+
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+    import json
+    import unittest
+    from unittest.mock import patch, mock_open, MagicMock
+
+    from hf_client import (
+        call_hf_pbr,
+        _resolve_fn_index,
+        _upload_file,
+        _join_queue,
+        _poll_queue,
+        _download_results,
+        _download_file,
+    )
+
+
+    class TestHFClient(unittest.TestCase):
+
+        @patch("hf_client.urllib.request.urlopen")
+        def test_resolve_fn_index_success(self, mock_urlopen):
+            mock_response = MagicMock()
+            mock_response.read.return_value = json.dumps({
+                "dependencies": [
+                    {"api_name": "foo"},
+                    {"api_name": "predict"},
+                ]
+            }).encode("utf-8")
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            result = _resolve_fn_index("predict")
+            self.assertEqual(result, 1)
+
+        @patch("hf_client.urllib.request.urlopen")
+        def test_resolve_fn_index_not_found(self, mock_urlopen):
+            mock_response = MagicMock()
+            mock_response.read.return_value = json.dumps({
+                "dependencies": [{"api_name": "foo"}]
+            }).encode("utf-8")
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            with self.assertRaises(RuntimeError):
+                _resolve_fn_index("missing")
+
+        @patch("hf_client.urllib.request.urlopen")
+        def test_join_queue_success(self, mock_urlopen):
+            mock_response = MagicMock()
+            mock_response.read.return_value = json.dumps({
+                "event_id": "evt123"
+            }).encode("utf-8")
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            payload = {"data": [], "fn_index": 0, "session_hash": "abc"}
+            result = _join_queue(payload)
+
+            self.assertEqual(result, "evt123")
+
+        @patch("hf_client.urllib.request.urlopen")
+        def test_poll_queue_success(self, mock_urlopen):
+            mock_response = MagicMock()
+            mock_response.__iter__.return_value = [
+                b'data: {"msg": "process_started"}\n',
+                b'data: {"msg": "process_completed", "output": {"data": ["a", "b"]}}\n',
+            ]
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            result = _poll_queue("abc")
+            self.assertEqual(result, ["a", "b"])
+
+        @patch("hf_client._download_file")
+        @patch("hf_client.tempfile.gettempdir")
+        def test_download_results(self, mock_tmp, mock_download):
+            mock_tmp.return_value = "/tmp"
+            mock_download.side_effect = [
+                "/tmp/depth.png",
+                "/tmp/normal.png",
+                "/tmp/roughness.png",
+                "/tmp/mask.png",
+            ]
+
+            output = [
+                {"url": "d"},
+                {"url": "n"},
+                {"url": "r"},
+                {"url": "m"},
+            ]
+
+            depth, normal, roughness, mask = _download_results(output)
+
+            self.assertEqual(depth, "/tmp/depth.png")
+            self.assertEqual(mask, "/tmp/mask.png")
+            self.assertEqual(mock_download.call_count, 4)
+
+        @patch("builtins.open", new_callable=mock_open)
+        @patch("hf_client.urllib.request.urlopen")
+        def test_download_file(self, mock_urlopen, mock_file):
+            mock_response = MagicMock()
+            mock_response.read.return_value = b"filedata"
+            mock_urlopen.return_value.__enter__.return_value = mock_response
+
+            path = _download_file("http://x", "/tmp/x.png")
+
+            self.assertEqual(path, "/tmp/x.png")
+            mock_file().write.assert_called_once_with(b"filedata")
+
+
+    if __name__ == "__main__":
+        unittest.main()

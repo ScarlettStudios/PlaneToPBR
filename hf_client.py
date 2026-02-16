@@ -5,7 +5,9 @@ import uuid
 import tempfile
 
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
-
+ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
+TEXTURE_DIR = os.path.join(ADDON_DIR, "textures")
+os.makedirs(TEXTURE_DIR, exist_ok=True)
 
 def call_hf_pbr(image_path, prompt=""):
 
@@ -37,6 +39,9 @@ def call_hf_pbr(image_path, prompt=""):
     print("Joined queue:", event_id)
 
     output = _poll_queue(session_hash)
+    diffuse_path = os.path.join(TEXTURE_DIR, "diffuse.png")
+    with open(diffuse_path, "wb") as out:
+        out.write(raw_bytes)
 
     return _download_results(output)
 
@@ -148,7 +153,7 @@ def _download_results(output):
     if not isinstance(output, list) or len(output) < 4:
         raise RuntimeError(f"Unexpected output format: {output}")
 
-    output_dir = tempfile.gettempdir()
+    output_dir = TEXTURE_DIR
 
     depth = _download_file(output[0]["url"], os.path.join(output_dir, "depth.png"))
     normal = _download_file(output[1]["url"], os.path.join(output_dir, "normal.png"))

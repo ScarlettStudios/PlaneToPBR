@@ -1,34 +1,5 @@
-import os
 import bpy
 
-def load_pbr_textures(texture_folder):
-     """Load PBR textures from a specified folder."""
-     textures = {
-         "diffuse": None,
-         "roughness": None,
-         "mask": None,
-         "normal": None,
-         "normal_extra": None,
-         "depth": None,
-     }
-
-     for filename in os.listdir(texture_folder):
-         filepath = os.path.join(texture_folder, filename)
-         filename_lower = filename.lower()
-
-         if "diffuse" in filename_lower:
-             textures["diffuse"] = filepath
-         elif "roughness" in filename_lower:
-             textures["roughness"] = filepath
-         elif "mask" in filename_lower:
-             textures["mask"] = filepath
-         elif "normal" in filename_lower:
-             textures["normal"] = filepath
-         elif "depth" in filename_lower:
-             textures["depth"] = filepath
-
-     print("Loaded textures:", textures)
-     return textures
 
 def import_plane_from_image(textures):
     """Import a plane and apply the diffuse image as a texture."""

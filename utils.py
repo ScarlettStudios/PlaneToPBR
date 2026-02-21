@@ -58,7 +58,7 @@ def add_modifiers(plane, textures):
     bpy.ops.object.modifier_add(type='DISPLACE')
     disp = plane.modifiers["Displace"]
 
-    if textures("depth"):
+    if textures.get("depth"):
         displacement_texture = bpy.data.textures.new(name="DisplacementTexture", type='IMAGE')
         displacement_texture.image = bpy.data.images.load(textures["depth"])
         displacement_texture.image.colorspace_settings.name = 'Non-Color'

@@ -1,7 +1,7 @@
 import bpy
 from bpy_extras.io_utils import ImportHelper
-from .hf_client import call_hf_pbr
-from .utils import import_plane_from_image
+from scripts.hf_client import call_hf_pbr
+from scripts.utils import import_plane_from_image
 
 class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
     """Operator to import a plane with a PBR material using an image as reference."""

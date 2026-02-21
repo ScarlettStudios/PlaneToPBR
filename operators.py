@@ -14,8 +14,8 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         """Execute the operator and import the plane from the diffuse image."""
         #textures = load_pbr_textures(self.directory)
-        call_hf_pbr(self.filepath, prompt="windows")
-        import_plane_from_image()
+        textures = call_hf_pbr(self.filepath, prompt="windows")
+        import_plane_from_image(textures)
         return {'FINISHED'}
 
     def invoke(self, context, event):

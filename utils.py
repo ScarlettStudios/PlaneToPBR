@@ -1,34 +1,5 @@
-import os
 import bpy
 
-def load_pbr_textures(texture_folder):
-     """Load PBR textures from a specified folder."""
-     textures = {
-         "diffuse": None,
-         "roughness": None,
-         "mask": None,
-         "normal": None,
-         "normal_extra": None,
-         "depth": None,
-     }
-
-     for filename in os.listdir(texture_folder):
-         filepath = os.path.join(texture_folder, filename)
-         filename_lower = filename.lower()
-
-         if "diffuse" in filename_lower:
-             textures["diffuse"] = filepath
-         elif "roughness" in filename_lower:
-             textures["roughness"] = filepath
-         elif "mask" in filename_lower:
-             textures["mask"] = filepath
-         elif "normal" in filename_lower:
-             textures["normal"] = filepath
-         elif "depth" in filename_lower:
-             textures["depth"] = filepath
-
-     print("Loaded textures:", textures)
-     return textures
 
 def import_plane_from_image(textures):
     """Import a plane and apply the diffuse image as a texture."""
@@ -36,7 +7,11 @@ def import_plane_from_image(textures):
         print("No diffuse image found!")
         return
 
-    img = bpy.data.images.load(textures["diffuse"])
+    try:
+        img = bpy.data.images.load(textures["diffuse"])
+    except Exception as e:
+        print(f"[PlaneToPBR] Failed to load diffuse image: {e}")
+        return
     aspect_ratio = img.size[0] / img.size[1]
     width = 2.0
     height = width / aspect_ratio
@@ -47,84 +22,24 @@ def import_plane_from_image(textures):
     plane.name = "PBR_Plane"
 
     bpy.ops.object.shade_smooth()
-    apply_pbr_textures(plane, textures)
-    plane.data.materials.append(bpy.data.materials.get("PBR_Material"))
+    mat = apply_pbr_textures(plane, textures)
+    plane.data.materials.append(mat)
 
     add_modifiers(plane, textures)
 
 def apply_pbr_textures(plane, textures):
-    """Apply the loaded PBR textures to the material of the plane."""
-    mat = bpy.data.materials.new(name="PBR_Material")
-    mat.use_nodes = True
-    nodes = mat.node_tree.nodes
-    links = mat.node_tree.links
+    mat, nodes, links, bsdf, mapping = _create_base_material()
 
-    nodes.clear()
+    if textures.get("diffuse"):
+        _add_diffuse(nodes, links, bsdf, mapping, textures["diffuse"])
 
-    output_node = nodes.new(type='ShaderNodeOutputMaterial')
-    output_node.location = (1200, 0)
+    if textures.get("roughness") and textures.get("mask"):
+        _add_roughness(nodes, links, bsdf, mapping, textures)
 
-    bsdf = nodes.new(type='ShaderNodeBsdfPrincipled')
-    bsdf.location = (900, 0)
-    links.new(bsdf.outputs['BSDF'], output_node.inputs['Surface'])
+    if textures.get("normal"):
+        _add_normal(nodes, links, bsdf, mapping, textures["normal"])
 
-    tex_coord = nodes.new(type='ShaderNodeTexCoord')
-    tex_coord.location = (-800, 0)
-
-    mapping = nodes.new(type='ShaderNodeMapping')
-    mapping.location = (-600, 0)
-    links.new(tex_coord.outputs['UV'], mapping.inputs['Vector'])
-
-    if textures["diffuse"]:
-        diffuse_node = nodes.new(type='ShaderNodeTexImage')
-        diffuse_node.image = bpy.data.images.load(textures["diffuse"])
-        diffuse_node.location = (-400, 300)
-        links.new(mapping.outputs['Vector'], diffuse_node.inputs['Vector'])
-        links.new(diffuse_node.outputs['Color'], bsdf.inputs['Base Color'])
-
-    if textures["roughness"] and textures["mask"]:
-        roughness_node = nodes.new(type='ShaderNodeTexImage')
-        roughness_node.image = bpy.data.images.load(textures["roughness"])
-        roughness_node.image.colorspace_settings.name = 'Non-Color'
-        roughness_node.location = (-400, 100)
-
-        mask_node = nodes.new(type='ShaderNodeTexImage')
-        mask_node.image = bpy.data.images.load(textures["mask"])
-        mask_node.image.colorspace_settings.name = 'Non-Color'
-        mask_node.location = (-400, -100)
-
-        mix_roughness_node = nodes.new(type='ShaderNodeMixRGB')
-        mix_roughness_node.location = (100, 100)
-        links.new(mapping.outputs['Vector'], roughness_node.inputs['Vector'])
-        links.new(mapping.outputs['Vector'], mask_node.inputs['Vector'])
-        links.new(roughness_node.outputs['Color'], mix_roughness_node.inputs['Color1'])
-
-        mix_roughness_node.inputs['Color2'].default_value = (0.082, 0.082, 0.082, 1)  # Hex #151515
-        links.new(mask_node.outputs['Color'], mix_roughness_node.inputs['Fac'])
-
-        links.new(mix_roughness_node.outputs['Color'], bsdf.inputs['Roughness'])
-
-    if textures["normal"]:
-        normal_node = nodes.new(type='ShaderNodeTexImage')
-        normal_node.image = bpy.data.images.load(textures["normal"])
-        normal_node.image.colorspace_settings.name = 'Non-Color'
-        normal_node.location = (-400, -300)
-
-        normal_map_node = nodes.new(type='ShaderNodeNormalMap')
-        normal_map_node.location = (400, -300)
-
-        links.new(mapping.outputs['Vector'], normal_node.inputs['Vector'])
-        links.new(normal_node.outputs['Color'], normal_map_node.inputs['Color'])
-
-        mix_normal_node = nodes.new(type='ShaderNodeMixRGB')
-        mix_normal_node.location = (600, -300)
-        mix_normal_node.blend_type = 'MIX'
-        mix_normal_node.inputs['Fac'].default_value = 0.5
-
-        links.new(normal_map_node.outputs['Normal'], mix_normal_node.inputs['Color1'])
-        links.new(normal_map_node.outputs['Normal'], mix_normal_node.inputs['Color2'])
-
-        links.new(mix_normal_node.outputs['Color'], bsdf.inputs['Normal'])
+    return mat
 
 def add_modifiers(plane, textures):
     """Add subdivision and displacement modifiers to the plane."""
@@ -143,7 +58,7 @@ def add_modifiers(plane, textures):
     bpy.ops.object.modifier_add(type='DISPLACE')
     disp = plane.modifiers["Displace"]
 
-    if textures["depth"]:
+    if textures.get("depth"):
         displacement_texture = bpy.data.textures.new(name="DisplacementTexture", type='IMAGE')
         displacement_texture.image = bpy.data.images.load(textures["depth"])
         displacement_texture.image.colorspace_settings.name = 'Non-Color'
@@ -152,3 +67,95 @@ def add_modifiers(plane, textures):
     disp.texture_coords = 'UV'
     disp.strength = 1.0
     disp.mid_level = 0.5
+
+# ------------------------------------------------------------
+# Base Material Setup
+# ------------------------------------------------------------
+
+def _create_base_material():
+    mat = bpy.data.materials.new(name="PBR_Material")
+    mat.use_nodes = True
+
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    nodes.clear()
+
+    # Output
+    output_node = nodes.new(type="ShaderNodeOutputMaterial")
+    output_node.location = (1200, 0)
+
+    # Principled BSDF
+    bsdf = nodes.new(type="ShaderNodeBsdfPrincipled")
+    bsdf.location = (900, 0)
+    links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
+
+    # Texture Coordinate
+    tex_coord = nodes.new(type="ShaderNodeTexCoord")
+    tex_coord.location = (-800, 0)
+
+    # Mapping
+    mapping = nodes.new(type="ShaderNodeMapping")
+    mapping.location = (-600, 0)
+    links.new(tex_coord.outputs["UV"], mapping.inputs["Vector"])
+
+    return mat, nodes, links, bsdf, mapping
+
+
+# ------------------------------------------------------------
+# Diffuse
+# ------------------------------------------------------------
+
+def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
+    diffuse_node = nodes.new(type="ShaderNodeTexImage")
+    diffuse_node.image = bpy.data.images.load(diffuse_path)
+    diffuse_node.location = (-400, 300)
+
+    links.new(mapping.outputs["Vector"], diffuse_node.inputs["Vector"])
+    links.new(diffuse_node.outputs["Color"], bsdf.inputs["Base Color"])
+
+
+# ------------------------------------------------------------
+# Roughness + Mask Blend
+# ------------------------------------------------------------
+
+def _add_roughness(nodes, links, bsdf, mapping, textures):
+    roughness_node = nodes.new(type="ShaderNodeTexImage")
+    roughness_node.image = bpy.data.images.load(textures["roughness"])
+    roughness_node.image.colorspace_settings.name = "Non-Color"
+    roughness_node.location = (-400, 100)
+
+    mask_node = nodes.new(type="ShaderNodeTexImage")
+    mask_node.image = bpy.data.images.load(textures["mask"])
+    mask_node.image.colorspace_settings.name = "Non-Color"
+    mask_node.location = (-400, -100)
+
+    mix_node = nodes.new(type="ShaderNodeMixRGB")
+    mix_node.location = (100, 100)
+
+    links.new(mapping.outputs["Vector"], roughness_node.inputs["Vector"])
+    links.new(mapping.outputs["Vector"], mask_node.inputs["Vector"])
+
+    links.new(roughness_node.outputs["Color"], mix_node.inputs["Color1"])
+    mix_node.inputs["Color2"].default_value = (0.082, 0.082, 0.082, 1)
+    links.new(mask_node.outputs["Color"], mix_node.inputs["Fac"])
+
+    links.new(mix_node.outputs["Color"], bsdf.inputs["Roughness"])
+
+
+# ------------------------------------------------------------
+# Normal
+# ------------------------------------------------------------
+
+def _add_normal(nodes, links, bsdf, mapping, normal_path):
+    normal_node = nodes.new(type="ShaderNodeTexImage")
+    normal_node.image = bpy.data.images.load(normal_path)
+    normal_node.image.colorspace_settings.name = "Non-Color"
+    normal_node.location = (-400, -300)
+
+    normal_map_node = nodes.new(type="ShaderNodeNormalMap")
+    normal_map_node.location = (400, -300)
+
+    links.new(mapping.outputs["Vector"], normal_node.inputs["Vector"])
+    links.new(normal_node.outputs["Color"], normal_map_node.inputs["Color"])
+
+    links.new(normal_map_node.outputs["Normal"], bsdf.inputs["Normal"])

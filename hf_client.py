@@ -160,7 +160,15 @@ def _download_results(output):
     roughness = _download_file(output[2]["url"], os.path.join(output_dir, "roughness.png"))
     mask = _download_file(output[3]["url"], os.path.join(output_dir, "mask.png"))
 
-    return depth, normal, roughness, mask
+    textures = {
+        "diffuse": os.path.join(TEXTURE_DIR, "diffuse.png"),
+        "depth": depth,
+        "normal": normal,
+        "roughness": roughness,
+        "mask": mask,
+    }
+
+    return textures
 
 def _download_file(url, path):
     with urllib.request.urlopen(url) as resp:

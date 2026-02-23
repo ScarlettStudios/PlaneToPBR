@@ -12,10 +12,8 @@ if REPO_ROOT not in sys.path:
     import unittest
     from unittest.mock import patch, mock_open, MagicMock
 
-    from hf_client import (
-        call_hf_pbr,
+    from scripts.hf_client import (
         _resolve_fn_index,
-        _upload_file,
         _join_queue,
         _poll_queue,
         _download_results,
@@ -25,7 +23,7 @@ if REPO_ROOT not in sys.path:
 
     class TestHFClient(unittest.TestCase):
 
-        @patch("hf_client.urllib.request.urlopen")
+        @patch("scripts.hf_client.urllib.request.urlopen")
         def test_resolve_fn_index_success(self, mock_urlopen):
             mock_response = MagicMock()
             mock_response.read.return_value = json.dumps({
@@ -39,7 +37,7 @@ if REPO_ROOT not in sys.path:
             result = _resolve_fn_index("predict")
             self.assertEqual(result, 1)
 
-        @patch("hf_client.urllib.request.urlopen")
+        @patch("scripts.hf_client.urllib.request.urlopen")
         def test_resolve_fn_index_not_found(self, mock_urlopen):
             mock_response = MagicMock()
             mock_response.read.return_value = json.dumps({
@@ -50,7 +48,7 @@ if REPO_ROOT not in sys.path:
             with self.assertRaises(RuntimeError):
                 _resolve_fn_index("missing")
 
-        @patch("hf_client.urllib.request.urlopen")
+        @patch("scripts.hf_client.urllib.request.urlopen")
         def test_join_queue_success(self, mock_urlopen):
             mock_response = MagicMock()
             mock_response.read.return_value = json.dumps({
@@ -63,7 +61,7 @@ if REPO_ROOT not in sys.path:
 
             self.assertEqual(result, "evt123")
 
-        @patch("hf_client.urllib.request.urlopen")
+        @patch("scripts.hf_client.urllib.request.urlopen")
         def test_poll_queue_success(self, mock_urlopen):
             mock_response = MagicMock()
             mock_response.__iter__.return_value = [
@@ -75,8 +73,8 @@ if REPO_ROOT not in sys.path:
             result = _poll_queue("abc")
             self.assertEqual(result, ["a", "b"])
 
-        @patch("hf_client._download_file")
-        @patch("hf_client.tempfile.gettempdir")
+        @patch("scripts.hf_client._download_file")
+        @patch("scripts.hf_client.tempfile.gettempdir")
         def test_download_results(self, mock_tmp, mock_download):
             mock_tmp.return_value = "/tmp"
             mock_download.side_effect = [
@@ -100,7 +98,7 @@ if REPO_ROOT not in sys.path:
             self.assertEqual(mock_download.call_count, 4)
 
         @patch("builtins.open", new_callable=mock_open)
-        @patch("hf_client.urllib.request.urlopen")
+        @patch("scripts.hf_client.urllib.request.urlopen")
         def test_download_file(self, mock_urlopen, mock_file):
             mock_response = MagicMock()
             mock_response.read.return_value = b"filedata"

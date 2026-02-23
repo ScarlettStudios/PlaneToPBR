@@ -91,10 +91,16 @@ if REPO_ROOT not in sys.path:
                 {"url": "m"},
             ]
 
-            depth, normal, roughness, mask = _download_results(output)
+            textures = _download_results(output)
 
-            self.assertEqual(depth, "/tmp/depth.png")
-            self.assertEqual(mask, "/tmp/mask.png")
+            self.assertEqual(textures["depth"], "/tmp/depth.png")
+            self.assertEqual(textures["normal"], "/tmp/normal.png")
+            self.assertEqual(textures["roughness"], "/tmp/roughness.png")
+            self.assertEqual(textures["mask"], "/tmp/mask.png")
+
+            # Optional: just validate diffuse points into TEXTURE_DIR
+            self.assertTrue(textures["diffuse"].endswith("diffuse.png"))
+
             self.assertEqual(mock_download.call_count, 4)
 
         @patch("builtins.open", new_callable=mock_open)

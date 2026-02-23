@@ -1,6 +1,5 @@
 import bpy
 
-
 def import_plane_from_image(textures):
     """Import a plane and apply the diffuse image as a texture."""
     if not textures["diffuse"]:

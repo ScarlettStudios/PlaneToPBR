@@ -78,7 +78,7 @@ If you use ComfyUI and want to get the depth, normal, roughness, and mask all in
 
 If you use ComfyUI and want to get the depth, normal, roughness, and mask all in one go, try my ComfyUI workflow. Download the PNG and pull it into ComfyUI. You can install any missing nodes using the ComfyUI Manager.
 
-![ComfyUI-PBR+mask](ComfyUI-PBR+mask.png)
+![ComfyUI-PBR+mask](assets/ComfyUI-PBR+mask.png)
 ## License
 
 This script is open-source and available under the [MIT License](https://opensource.org/licenses/MIT). Feel free to use and modify it as you see fit.

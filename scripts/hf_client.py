@@ -2,7 +2,6 @@ import urllib.request
 import json
 import os
 import uuid
-import tempfile
 
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 ADDON_DIR = os.path.dirname(os.path.abspath(__file__))

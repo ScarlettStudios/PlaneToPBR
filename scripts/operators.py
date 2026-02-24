@@ -11,6 +11,13 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
 
     directory: bpy.props.StringProperty(subtype="DIR_PATH")
 
+    # 🔹 This adds the text input field
+    hf_prompt: bpy.props.StringProperty(
+        name="HF Prompt",
+        description="Describe what material or surface this image represents",
+        default="",
+    )
+
     def execute(self, context):
         """Execute the operator and import the plane from the diffuse image."""
         #textures = load_pbr_textures(self.directory)

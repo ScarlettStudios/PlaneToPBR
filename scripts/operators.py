@@ -11,10 +11,23 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
 
     directory: bpy.props.StringProperty(subtype="DIR_PATH")
 
+    filename_ext = ".png"
+    filter_glob: bpy.props.StringProperty(
+        default="*.png;*.jpg;*.jpeg",
+        options={'HIDDEN'}
+    )
+
+    # 🔹 This adds the text input field
+    hf_prompt: bpy.props.StringProperty(
+        name="HF Prompt",
+        description="Describe what material or surface this image represents",
+        default="",
+    )
+
     def execute(self, context):
         """Execute the operator and import the plane from the diffuse image."""
         #textures = load_pbr_textures(self.directory)
-        textures = call_hf_pbr(self.filepath, prompt="windows")
+        textures = call_hf_pbr(self.filepath, prompt=self.hf_prompt)
         import_plane_from_image(textures)
         return {'FINISHED'}
 
@@ -22,6 +35,10 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
         """Invoke the directory selection dialog."""
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "hf_prompt")
 
 def menu_func(self, context):
     """Add the operator to the 'Add Mesh' menu."""

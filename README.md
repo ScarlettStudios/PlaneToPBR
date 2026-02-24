@@ -92,3 +92,10 @@ This script wouldn't be possible without the excellent free tools provided by th
 - **Smart-Page.net** for the [Smart Normal](https://www.smart-page.net/smartnormal/) tool
 - **Photo-Kako** for their [Photo-Kako](https://www.photo-kako.com/en/hpf/) tool
 - **Pieter-Jan Hoedt (prs-eth)** for [Marigold](https://huggingface.co/spaces/prs-eth/marigold) on Hugging Face
+
+
+## Run Tests
+
+1. podman(or docker) build --no-cache -t planetopbr-tests .
+2. podman(or docker) run --rm planetopbr-tests
+3. 

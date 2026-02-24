@@ -11,6 +11,12 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
 
     directory: bpy.props.StringProperty(subtype="DIR_PATH")
 
+    filename_ext = ".png"
+    filter_glob: bpy.props.StringProperty(
+        default="*.png;*.jpg;*.jpeg",
+        options={'HIDDEN'}
+    )
+
     # 🔹 This adds the text input field
     hf_prompt: bpy.props.StringProperty(
         name="HF Prompt",

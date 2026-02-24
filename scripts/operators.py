@@ -30,6 +30,10 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(self, "hf_prompt")
+
 def menu_func(self, context):
     """Add the operator to the 'Add Mesh' menu."""
     self.layout.operator(OBJECT_OT_import_plane_from_image.bl_idname)

@@ -12,41 +12,47 @@ TEXTURE_DIR = os.path.join(ADDON_DIR, "textures")
 os.makedirs(TEXTURE_DIR, exist_ok=True)
 
 def call_hf_pbr(image_path, prompt=""):
+    try:
+        fn_index = _resolve_fn_index("predict")
+        session_hash = uuid.uuid4().hex
 
-    fn_index = _resolve_fn_index("predict")
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image not found: {image_path}")
 
-    session_hash = uuid.uuid4().hex
+        with open(image_path, "rb") as f:
+            raw_bytes = f.read()
 
-    with open(image_path, "rb") as f:
-        raw_bytes = f.read()
+        uploaded_path = _upload_file(image_path, raw_bytes)
+        filename = os.path.basename(image_path)
 
-    uploaded_path = _upload_file(image_path, raw_bytes)
-    filename = os.path.basename(image_path)
+        payload = {
+            "data": [
+                {
+                    "path": uploaded_path,
+                    "orig_name": filename,
+                    "size": len(raw_bytes),
+                    "mime_type": "image/png",
+                },
+                prompt,
+            ],
+            "fn_index": fn_index,
+            "session_hash": session_hash
+        }
 
-    payload = {
-        "data": [
-            {
-                "path": uploaded_path,
-                "orig_name": filename,
-                "size": len(raw_bytes),
-                "mime_type": "image/png",
-            },
-            prompt,
-        ],
-        "fn_index": fn_index,
-        "session_hash": session_hash
-    }
+        event_id = _join_queue(payload)
+        print("Joined queue:", event_id)
 
-    event_id = _join_queue(payload)
-    print("Joined queue:", event_id)
+        output = _poll_queue(session_hash)
 
-    output = _poll_queue(session_hash)
-    diffuse_path = os.path.join(TEXTURE_DIR, "diffuse.png")
-    with open(diffuse_path, "wb") as out:
-        out.write(raw_bytes)
+        # Save diffuse fallback
+        diffuse_path = os.path.join(TEXTURE_DIR, "diffuse.png")
+        with open(diffuse_path, "wb") as out:
+            out.write(raw_bytes)
 
-    return _download_results(output)
+        return _download_results(output)
 
+    except Exception as e:
+        raise RuntimeError(f"HF PBR generation failed: {e}")
 
 def _resolve_fn_index(api_name="predict"):
     """

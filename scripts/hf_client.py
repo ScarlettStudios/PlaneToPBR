@@ -1,11 +1,13 @@
+import urllib.error
 import urllib.request
 import json
 import os
 import uuid
+import socket
 # Leave for tests
 import tempfile
 
-
+REQUEST_TIMEOUT = 120
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 TEXTURE_DIR = os.path.join(ADDON_DIR, "textures")
@@ -207,13 +209,15 @@ def _download_results(output):
     except KeyError as e:
         raise RuntimeError(f"Missing expected output field: {e}")
 
-    return {
+    textures = {
         "diffuse": os.path.join(TEXTURE_DIR, "diffuse.png"),
         "depth": depth,
         "normal": normal,
         "roughness": roughness,
         "mask": mask,
     }
+
+    return textures
 
 def _download_file(url, path):
         try:

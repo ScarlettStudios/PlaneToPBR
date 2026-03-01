@@ -17,6 +17,18 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
 
         layout.separator()
 
+        # Image row (label + path + folder icon)
+        # row = layout.row(align=True)
+        # row.prop(scene, "planetopbr_image_path", text="Image")
+        # row.operator(
+        #     "planetopbr.select_image",
+        #     text="",
+        #     icon='FILE_FOLDER'
+        # )
+        layout.prop(scene, "planetopbr_image_path", text="Image")
+
+        layout.separator()
+
         layout.operator(
             "object.import_plane_from_image",
             text="Generate PBR Plane",

@@ -199,20 +199,21 @@ def _download_results(output):
 
     output_dir = TEXTURE_DIR
 
-    depth = _download_file(output[0]["url"], os.path.join(output_dir, "depth.png"))
-    normal = _download_file(output[1]["url"], os.path.join(output_dir, "normal.png"))
-    roughness = _download_file(output[2]["url"], os.path.join(output_dir, "roughness.png"))
-    mask = _download_file(output[3]["url"], os.path.join(output_dir, "mask.png"))
+    try:
+        depth = _download_file(output[0]["url"], os.path.join(output_dir, "depth.png"))
+        normal = _download_file(output[1]["url"], os.path.join(output_dir, "normal.png"))
+        roughness = _download_file(output[2]["url"], os.path.join(output_dir, "roughness.png"))
+        mask = _download_file(output[3]["url"], os.path.join(output_dir, "mask.png"))
+    except KeyError as e:
+        raise RuntimeError(f"Missing expected output field: {e}")
 
-    textures = {
+    return {
         "diffuse": os.path.join(TEXTURE_DIR, "diffuse.png"),
         "depth": depth,
         "normal": normal,
         "roughness": roughness,
         "mask": mask,
     }
-
-    return textures
 
 def _download_file(url, path):
     with urllib.request.urlopen(url) as resp:

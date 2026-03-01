@@ -8,5 +8,13 @@ def register():
         default="",
     )
 
+    bpy.types.Scene.planetopbr_image_path = StringProperty(
+        name="Image",
+        description="Path to source image",
+        default="",
+        subtype='FILE_PATH'
+    )
+
 def unregister():
     del bpy.types.Scene.planetopbr_prompt
+    del bpy.types.Scene.planetopbr_image_path

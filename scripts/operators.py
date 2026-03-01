@@ -105,26 +105,8 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
 
         return {'PASS_THROUGH'}
 
-
-# class OBJECT_OT_select_image(bpy.types.Operator, ImportHelper):
-#     """Select an image file"""
-#     bl_idname = "planetopbr.select_image"
-#     bl_label = "Select Image"
-#
-#     filename_ext = ".png"
-#     filter_glob: StringProperty(
-#         default="*.png;*.jpg;*.jpeg",
-#         options={'HIDDEN'}
-#     )
-#
-#     def execute(self, context):
-#         context.scene.planetopbr_image_path = self.filepath
-#         return {'FINISHED'}
-
 def register():
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
-    #bpy.utils.register_class(OBJECT_OT_select_image)
 
 def unregister():
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
-    #bpy.utils.unregister_class(OBJECT_OT_select_image)

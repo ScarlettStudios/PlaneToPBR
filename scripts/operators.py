@@ -73,25 +73,34 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     # ----------------------------
     def modal(self, context, event):
         if event.type == 'TIMER':
-
             wm = context.window_manager
 
             if not self._done:
-                # Animate spinner progress
                 self._progress = (self._progress + 2) % 100
                 wm.progress_update(self._progress)
                 return {'PASS_THROUGH'}
 
-            # Done
+            # Cleanup always
             wm.event_timer_remove(self._timer)
             wm.progress_end()
 
-            if self._textures:
-                import_plane_from_image(self._textures)
-                self.report({'INFO'}, "PBR textures imported.")
-                return {'FINISHED'}
-            else:
-                self.report({'ERROR'}, "Failed to generate PBR textures.")
+            # HF Error
+            if self._error_message:
+                self.report({'ERROR'}, self._error_message)
+                return {'CANCELLED'}
+
+            # Import Textures
+            try:
+                if self._textures:
+                    import_plane_from_image(self._textures)
+                    self.report({'INFO'}, "PBR textures imported.")
+                    return {'FINISHED'}
+                else:
+                    self.report({'ERROR'}, "Failed to generate PBR textures.")
+                    return {'CANCELLED'}
+
+            except Exception as e:
+                self.report({'ERROR'}, f"Import failed: {e}")
                 return {'CANCELLED'}
 
         return {'PASS_THROUGH'}

@@ -216,8 +216,20 @@ def _download_results(output):
     }
 
 def _download_file(url, path):
-    with urllib.request.urlopen(url) as resp:
-        data = resp.read()
-    with open(path, "wb") as f:
-        f.write(data)
-    return path
+        try:
+            with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as resp:
+                data = resp.read()
+        except urllib.error.HTTPError as e:
+            raise RuntimeError(f"Download HTTP error: {e.code} {e.reason}")
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Download connection error: {e.reason}")
+        except socket.timeout:
+            raise RuntimeError("Download timed out.")
+
+        try:
+            with open(path, "wb") as f:
+                f.write(data)
+        except OSError as e:
+            raise RuntimeError(f"Failed to write file {path}: {e}")
+
+        return path

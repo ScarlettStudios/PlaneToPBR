@@ -159,29 +159,37 @@ def _poll_queue(session_hash):
 
     poll_url = f"{SPACE_BASE}/gradio_api/queue/data?session_hash={session_hash}"
 
-    with urllib.request.urlopen(poll_url) as resp:
-        for raw_line in resp:
-            line = raw_line.decode().strip()
+    try:
+        with urllib.request.urlopen(poll_url, timeout=REQUEST_TIMEOUT) as resp:
+            for raw_line in resp:
+                line = raw_line.decode().strip()
 
-            if not line.startswith("data:"):
-                continue
+                if not line.startswith("data:"):
+                    continue
 
-            json_str = line.replace("data:", "").strip()
-            if not json_str:
-                continue
+                json_str = line.replace("data:", "").strip()
+                if not json_str:
+                    continue
 
-            event = json.loads(json_str)
+                event = json.loads(json_str)
 
-            if event.get("msg") == "process_completed":
-                result_output = event.get("output")
+                if event.get("msg") == "process_completed":
+                    result_output = event.get("output")
 
-                if isinstance(result_output, dict) and result_output.get("data"):
-                    return result_output["data"]
-                else:
-                    raise RuntimeError(f"Space error: {event}")
+                    if isinstance(result_output, dict) and result_output.get("data"):
+                        return result_output["data"]
+                    else:
+                        raise RuntimeError(f"Space error: {event}")
 
-            if event.get("msg") == "process_failed":
-                raise RuntimeError(f"Space failed: {event}")
+                if event.get("msg") == "process_failed":
+                    raise RuntimeError(f"Space failed: {event}")
+
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Queue polling connection error: {e.reason}")
+    except socket.timeout:
+        raise RuntimeError("Queue polling timed out.")
+    except json.JSONDecodeError:
+        raise RuntimeError("Invalid JSON received while polling queue.")
 
     raise RuntimeError("No output received from Space.")
 

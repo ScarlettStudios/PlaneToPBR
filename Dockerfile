@@ -1,4 +1,3 @@
-# Use slim Python base for small CI image
 FROM python:3.11-slim
 
 # Prevent Python from writing pyc files
@@ -13,12 +12,10 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files
-COPY . /app
+COPY requirements.txt .
 
-# Install test dependencies
-RUN pip install --no-cache-dir \
-    pytest
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Default command (can be overridden in CI)
+COPY . .
+
 CMD ["pytest", "-v"]

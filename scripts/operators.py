@@ -1,19 +1,16 @@
 import bpy
 import threading
-from bpy_extras.io_utils import ImportHelper
-from bpy.props import StringProperty
+# from bpy_extras.io_utils import ImportHelper
+# from bpy.props import StringProperty
 from .hf_client import call_hf_pbr
 from .utils import import_plane_from_image
 
-class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
+class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     """Operator to import a plane with a PBR material using an image as reference."""
 
     bl_idname = "object.import_plane_from_image"
     bl_label = "Import Plane from Image"
     bl_options = {'REGISTER', 'UNDO'}
-
-    filename_ext = ".png"
-    filter_glob: StringProperty(default="*.png;*.jpg;*.jpeg",options={'HIDDEN'})
 
     _timer = None
     _thread = None
@@ -39,15 +36,21 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
     # ----------------------------
     def execute(self, context):
         prompt = context.scene.planetopbr_prompt
+        image_path = context.scene.planetopbr_image_path
+
+        if not image_path:
+            self.report({'ERROR'}, "No image selected")
+            return {'CANCELLED'}
 
         self._done = False
         self._textures = None
         self._progress = 0
 
+
         # Start background thread
         self._thread = threading.Thread(
             target=self._run_hf,
-            args=(self.filepath, prompt),
+            args=(image_path, prompt),
             daemon=True
         )
         self._thread.start()
@@ -90,14 +93,26 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator, ImportHelper):
 
         return {'PASS_THROUGH'}
 
-    def invoke(self, context, event):
-        """Invoke the directory selection dialog."""
-        context.window_manager.fileselect_add(self)
-        return {'RUNNING_MODAL'}
 
+# class OBJECT_OT_select_image(bpy.types.Operator, ImportHelper):
+#     """Select an image file"""
+#     bl_idname = "planetopbr.select_image"
+#     bl_label = "Select Image"
+#
+#     filename_ext = ".png"
+#     filter_glob: StringProperty(
+#         default="*.png;*.jpg;*.jpeg",
+#         options={'HIDDEN'}
+#     )
+#
+#     def execute(self, context):
+#         context.scene.planetopbr_image_path = self.filepath
+#         return {'FINISHED'}
 
 def register():
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
+    #bpy.utils.register_class(OBJECT_OT_select_image)
 
 def unregister():
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
+    #bpy.utils.unregister_class(OBJECT_OT_select_image)

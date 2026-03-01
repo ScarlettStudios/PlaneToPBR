@@ -134,10 +134,16 @@ def _join_queue(payload):
     )
 
     try:
-        with urllib.request.urlopen(join_req) as resp:
+        with urllib.request.urlopen(join_req, timeout=REQUEST_TIMEOUT) as resp:
             join_data = json.loads(resp.read().decode())
-    except Exception as e:
-        raise RuntimeError(f"Failed to join queue: {e}")
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Queue join HTTP error: {e.code} {e.reason}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Queue join connection error: {e.reason}")
+    except json.JSONDecodeError:
+        raise RuntimeError("Invalid JSON returned from queue join.")
+    except socket.timeout:
+        raise RuntimeError("Queue join timed out.")
 
     event_id = join_data.get("event_id")
     if not event_id:

@@ -93,10 +93,10 @@ def _upload_file(image_path, raw_bytes):
     filename = os.path.basename(image_path)
 
     body = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'
-        f"Content-Type: image/png\r\n\r\n"
-    ).encode("utf-8") + raw_bytes + f"\r\n--{boundary}--\r\n".encode("utf-8")
+               f"--{boundary}\r\n"
+               f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'
+               f"Content-Type: image/png\r\n\r\n"
+           ).encode("utf-8") + raw_bytes + f"\r\n--{boundary}--\r\n".encode("utf-8")
 
     upload_req = urllib.request.Request(
         f"{SPACE_BASE}/gradio_api/upload",
@@ -105,8 +105,20 @@ def _upload_file(image_path, raw_bytes):
         method="POST",
     )
 
-    with urllib.request.urlopen(upload_req) as resp:
-        upload_data = json.loads(resp.read().decode())
+    try:
+        with urllib.request.urlopen(upload_req, timeout=REQUEST_TIMEOUT) as resp:
+            upload_data = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Upload HTTP error: {e.code} {e.reason}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Upload connection error: {e.reason}")
+    except json.JSONDecodeError:
+        raise RuntimeError("Invalid JSON returned during upload.")
+    except socket.timeout:
+        raise RuntimeError("Upload request timed out.")
+
+    if not upload_data:
+        raise RuntimeError("Upload returned empty response.")
 
     return upload_data[0]
 

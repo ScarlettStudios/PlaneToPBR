@@ -17,6 +17,7 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     _done = False
     _textures = None
     _progress = 0
+    _error_message = None
 
     # ----------------------------
     # BACKGROUND THREAD FUNCTION
@@ -25,8 +26,8 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
         try:
             self._textures = call_hf_pbr(filepath, prompt=prompt)
         except Exception as e:
-            print("HF ERROR:", e)
             self._textures = None
+            self._error_message = str(e)
         finally:
             self._done = True
 

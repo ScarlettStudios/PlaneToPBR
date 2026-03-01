@@ -60,10 +60,20 @@ def _resolve_fn_index(api_name="predict"):
     from the Space config endpoint.
     """
     try:
-        with urllib.request.urlopen(f"{SPACE_BASE}/config") as resp:
+        with urllib.request.urlopen(
+                f"{SPACE_BASE}/config",
+                timeout=REQUEST_TIMEOUT
+        ) as resp:
             config = json.loads(resp.read().decode())
-    except Exception as e:
-        raise RuntimeError(f"Failed to fetch Space config: {e}")
+
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP error fetching Space config: {e.code} {e.reason}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Connection error fetching Space config: {e.reason}")
+    except json.JSONDecodeError:
+        raise RuntimeError("Invalid JSON received from Space config.")
+    except socket.timeout:
+        raise RuntimeError("Timeout fetching Space config.")
 
     dependencies = config.get("dependencies")
     if not dependencies:

@@ -36,35 +36,37 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     # EXECUTE
     # ----------------------------
     def execute(self, context):
-        prompt = context.scene.planetopbr_prompt
-        image_path = context.scene.planetopbr_image_path
+        try:
+            prompt = context.scene.planetopbr_prompt
+            image_path = context.scene.planetopbr_image_path
 
-        if not image_path:
-            self.report({'ERROR'}, "No image selected")
+            if not image_path:
+                self.report({'ERROR'}, "No image selected")
+                return {'CANCELLED'}
+
+            self._done = False
+            self._textures = None
+            self._progress = 0
+            self._error_message = None
+
+            self._thread = threading.Thread(
+                target=self._run_hf,
+                args=(image_path, prompt),
+                daemon=True
+            )
+            self._thread.start()
+
+            wm = context.window_manager
+            wm.progress_begin(0, 100)
+
+            self._timer = wm.event_timer_add(0.1, window=context.window)
+            wm.modal_handler_add(self)
+
+            return {'RUNNING_MODAL'}
+
+        except Exception as e:
+            self.report({'ERROR'}, f"Unexpected error: {e}")
             return {'CANCELLED'}
-
-        self._done = False
-        self._textures = None
-        self._progress = 0
-
-
-        # Start background thread
-        self._thread = threading.Thread(
-            target=self._run_hf,
-            args=(image_path, prompt),
-            daemon=True
-        )
-        self._thread.start()
-
-        # Start spinner
-        wm = context.window_manager
-        wm.progress_begin(0, 100)
-
-        # Start modal timer
-        self._timer = wm.event_timer_add(0.1, window=context.window)
-        wm.modal_handler_add(self)
-
-        return {'RUNNING_MODAL'}
 
     # ----------------------------
     # MODAL LOOP

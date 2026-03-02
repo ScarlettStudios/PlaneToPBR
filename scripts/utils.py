@@ -2,27 +2,46 @@ import bpy
 
 def import_plane_from_image(textures):
     """Import a plane and apply the diffuse image as a texture."""
-    if not textures["diffuse"]:
-        print("No diffuse image found!")
-        return
+
+    if not isinstance(textures, dict):
+        raise RuntimeError("Invalid textures payload.")
+
+    diffuse_path = textures.get("diffuse")
+    if not diffuse_path:
+        raise RuntimeError("Diffuse texture missing.")
 
     try:
-        img = bpy.data.images.load(textures["diffuse"])
+        img = bpy.data.images.load(diffuse_path)
     except Exception as e:
-        print(f"[PlaneToPBR] Failed to load diffuse image: {e}")
-        return
+        raise RuntimeError(f"Failed to load diffuse image: {e}")
+
+    if img.size[1] == 0:
+        raise RuntimeError("Invalid image dimensions.")
+
     aspect_ratio = img.size[0] / img.size[1]
     width = 2.0
     height = width / aspect_ratio
 
-    bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
-    plane = bpy.context.active_object
+    try:
+        bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
+        plane = bpy.context.active_object
+    except Exception as e:
+        raise RuntimeError(f"Failed to create plane: {e}")
+
     plane.scale = (width / 2, height / 2, 1)
     plane.name = "PBR_Plane"
 
-    bpy.ops.object.shade_smooth()
+    try:
+        bpy.ops.object.shade_smooth()
+    except Exception:
+        pass  # Not critical
+
     mat = apply_pbr_textures(plane, textures)
-    plane.data.materials.append(mat)
+
+    try:
+        plane.data.materials.append(mat)
+    except Exception as e:
+        raise RuntimeError(f"Failed to assign material: {e}")
 
     add_modifiers(plane, textures)
 
@@ -41,39 +60,49 @@ def apply_pbr_textures(plane, textures):
     return mat
 
 def add_modifiers(plane, textures):
-    """Add subdivision and displacement modifiers to the plane."""
-    bpy.ops.object.modifier_add(type='SUBSURF')
-    sub1 = plane.modifiers["Subdivision"]
-    sub1.subdivision_type = 'SIMPLE'
-    sub1.levels = 6
-    sub1.render_levels = 6
+    try:
+        bpy.ops.object.modifier_add(type='SUBSURF')
+        sub1 = plane.modifiers["Subdivision"]
+        sub1.subdivision_type = 'SIMPLE'
+        sub1.levels = 6
+        sub1.render_levels = 6
 
-    bpy.ops.object.modifier_add(type='SUBSURF')
-    sub2 = plane.modifiers["Subdivision.001"]
-    sub2.subdivision_type = 'SIMPLE'
-    sub2.levels = 1
-    sub2.render_levels = 1
+        bpy.ops.object.modifier_add(type='SUBSURF')
+        sub2 = plane.modifiers["Subdivision.001"]
+        sub2.subdivision_type = 'SIMPLE'
+        sub2.levels = 1
+        sub2.render_levels = 1
 
-    bpy.ops.object.modifier_add(type='DISPLACE')
-    disp = plane.modifiers["Displace"]
+        bpy.ops.object.modifier_add(type='DISPLACE')
+        disp = plane.modifiers["Displace"]
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to add modifiers: {e}")
 
     if textures.get("depth"):
-        displacement_texture = bpy.data.textures.new(name="DisplacementTexture", type='IMAGE')
-        displacement_texture.image = bpy.data.images.load(textures["depth"])
-        displacement_texture.image.colorspace_settings.name = 'Non-Color'
-        disp.texture = displacement_texture
+        try:
+            displacement_texture = bpy.data.textures.new(
+                name="DisplacementTexture", type='IMAGE'
+            )
+            displacement_texture.image = bpy.data.images.load(textures["depth"])
+            displacement_texture.image.colorspace_settings.name = 'Non-Color'
+            disp.texture = displacement_texture
+        except Exception as e:
+            raise RuntimeError(f"Failed to load depth texture: {e}")
 
     disp.texture_coords = 'UV'
     disp.strength = 1.0
     disp.mid_level = 0.5
-
 # ------------------------------------------------------------
 # Base Material Setup
 # ------------------------------------------------------------
 
 def _create_base_material():
-    mat = bpy.data.materials.new(name="PBR_Material")
-    mat.use_nodes = True
+    try:
+        mat = bpy.data.materials.new(name="PBR_Material")
+        mat.use_nodes = True
+    except Exception as e:
+        raise RuntimeError(f"Failed to create base material: {e}")
 
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
@@ -105,8 +134,12 @@ def _create_base_material():
 # ------------------------------------------------------------
 
 def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
-    diffuse_node = nodes.new(type="ShaderNodeTexImage")
-    diffuse_node.image = bpy.data.images.load(diffuse_path)
+    try:
+        diffuse_node = nodes.new(type="ShaderNodeTexImage")
+        diffuse_node.image = bpy.data.images.load(diffuse_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load diffuse texture node: {e}")
+
     diffuse_node.location = (-400, 300)
 
     links.new(mapping.outputs["Vector"], diffuse_node.inputs["Vector"])
@@ -119,12 +152,18 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
 
 def _add_roughness(nodes, links, bsdf, mapping, textures):
     roughness_node = nodes.new(type="ShaderNodeTexImage")
-    roughness_node.image = bpy.data.images.load(textures["roughness"])
+    try:
+        roughness_node.image = bpy.data.images.load(textures["roughness"])
+    except Exception as e:
+        raise RuntimeError(f"Failed to load roughness map: {e}")
     roughness_node.image.colorspace_settings.name = "Non-Color"
     roughness_node.location = (-400, 100)
 
     mask_node = nodes.new(type="ShaderNodeTexImage")
-    mask_node.image = bpy.data.images.load(textures["mask"])
+    try:
+        mask_node.image = bpy.data.images.load(textures["mask"])
+    except Exception as e:
+        raise RuntimeError(f"Failed to load mask map: {e}")
     mask_node.image.colorspace_settings.name = "Non-Color"
     mask_node.location = (-400, -100)
 
@@ -147,7 +186,10 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
 
 def _add_normal(nodes, links, bsdf, mapping, normal_path):
     normal_node = nodes.new(type="ShaderNodeTexImage")
-    normal_node.image = bpy.data.images.load(normal_path)
+    try:
+        normal_node.image = bpy.data.images.load(normal_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load normal map: {e}")
     normal_node.image.colorspace_settings.name = "Non-Color"
     normal_node.location = (-400, -300)
 

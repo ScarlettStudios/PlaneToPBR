@@ -180,7 +180,10 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
 
 def _add_normal(nodes, links, bsdf, mapping, normal_path):
     normal_node = nodes.new(type="ShaderNodeTexImage")
-    normal_node.image = bpy.data.images.load(normal_path)
+    try:
+        normal_node.image = bpy.data.images.load(normal_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load normal map: {e}")
     normal_node.image.colorspace_settings.name = "Non-Color"
     normal_node.location = (-400, -300)
 

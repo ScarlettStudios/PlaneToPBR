@@ -129,9 +129,7 @@ class TestHFClient(unittest.TestCase):
         self.assertEqual(result, ["a", "b"])
 
     @patch("scripts.hf_client._download_file")
-    @patch("scripts.hf_client.tempfile.gettempdir")
-    def test_download_results(self, mock_tmp, mock_download):
-        mock_tmp.return_value = "/tmp"
+    def test_download_results(self, mock_download):
         mock_download.side_effect = [
             "/tmp/depth.png",
             "/tmp/normal.png",

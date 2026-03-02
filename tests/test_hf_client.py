@@ -98,6 +98,24 @@ class TestHFClient(unittest.TestCase):
 
         self.assertEqual(result, "evt123")
 
+    @patch("scripts.hf_client._resolve_fn_index")
+    @patch("scripts.hf_client.os.path.exists", return_value=True)
+    @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
+    def test_call_hf_pbr_wraps_exception(
+            self,
+            mock_file,
+            mock_exists,
+            mock_resolve,
+    ):
+        mock_resolve.side_effect = Exception("boom")
+
+        from scripts.hf_client import call_hf_pbr
+
+        with self.assertRaises(RuntimeError) as ctx:
+            call_hf_pbr("fake.png")
+
+        self.assertIn("HF PBR generation failed", str(ctx.exception))
+
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_poll_queue_success(self, mock_urlopen):
         mock_response = MagicMock()

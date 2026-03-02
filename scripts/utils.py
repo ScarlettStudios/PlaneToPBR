@@ -98,8 +98,11 @@ def add_modifiers(plane, textures):
 # ------------------------------------------------------------
 
 def _create_base_material():
-    mat = bpy.data.materials.new(name="PBR_Material")
-    mat.use_nodes = True
+    try:
+        mat = bpy.data.materials.new(name="PBR_Material")
+        mat.use_nodes = True
+    except Exception as e:
+        raise RuntimeError(f"Failed to create base material: {e}")
 
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links

@@ -131,8 +131,12 @@ def _create_base_material():
 # ------------------------------------------------------------
 
 def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
-    diffuse_node = nodes.new(type="ShaderNodeTexImage")
-    diffuse_node.image = bpy.data.images.load(diffuse_path)
+    try:
+        diffuse_node = nodes.new(type="ShaderNodeTexImage")
+        diffuse_node.image = bpy.data.images.load(diffuse_path)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load diffuse texture node: {e}")
+
     diffuse_node.location = (-400, 300)
 
     links.new(mapping.outputs["Vector"], diffuse_node.inputs["Vector"])

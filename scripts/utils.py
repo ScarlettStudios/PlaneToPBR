@@ -60,32 +60,39 @@ def apply_pbr_textures(plane, textures):
     return mat
 
 def add_modifiers(plane, textures):
-    """Add subdivision and displacement modifiers to the plane."""
-    bpy.ops.object.modifier_add(type='SUBSURF')
-    sub1 = plane.modifiers["Subdivision"]
-    sub1.subdivision_type = 'SIMPLE'
-    sub1.levels = 6
-    sub1.render_levels = 6
+    try:
+        bpy.ops.object.modifier_add(type='SUBSURF')
+        sub1 = plane.modifiers["Subdivision"]
+        sub1.subdivision_type = 'SIMPLE'
+        sub1.levels = 6
+        sub1.render_levels = 6
 
-    bpy.ops.object.modifier_add(type='SUBSURF')
-    sub2 = plane.modifiers["Subdivision.001"]
-    sub2.subdivision_type = 'SIMPLE'
-    sub2.levels = 1
-    sub2.render_levels = 1
+        bpy.ops.object.modifier_add(type='SUBSURF')
+        sub2 = plane.modifiers["Subdivision.001"]
+        sub2.subdivision_type = 'SIMPLE'
+        sub2.levels = 1
+        sub2.render_levels = 1
 
-    bpy.ops.object.modifier_add(type='DISPLACE')
-    disp = plane.modifiers["Displace"]
+        bpy.ops.object.modifier_add(type='DISPLACE')
+        disp = plane.modifiers["Displace"]
+
+    except Exception as e:
+        raise RuntimeError(f"Failed to add modifiers: {e}")
 
     if textures.get("depth"):
-        displacement_texture = bpy.data.textures.new(name="DisplacementTexture", type='IMAGE')
-        displacement_texture.image = bpy.data.images.load(textures["depth"])
-        displacement_texture.image.colorspace_settings.name = 'Non-Color'
-        disp.texture = displacement_texture
+        try:
+            displacement_texture = bpy.data.textures.new(
+                name="DisplacementTexture", type='IMAGE'
+            )
+            displacement_texture.image = bpy.data.images.load(textures["depth"])
+            displacement_texture.image.colorspace_settings.name = 'Non-Color'
+            disp.texture = displacement_texture
+        except Exception as e:
+            raise RuntimeError(f"Failed to load depth texture: {e}")
 
     disp.texture_coords = 'UV'
     disp.strength = 1.0
     disp.mid_level = 0.5
-
 # ------------------------------------------------------------
 # Base Material Setup
 # ------------------------------------------------------------

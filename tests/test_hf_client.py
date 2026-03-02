@@ -151,10 +151,22 @@ class TestHFClient(unittest.TestCase):
         self.assertEqual(textures["roughness"], "/tmp/roughness.png")
         self.assertEqual(textures["mask"], "/tmp/mask.png")
 
-        # Optional: just validate diffuse points into TEXTURE_DIR
         self.assertTrue(textures["diffuse"].endswith("diffuse.png"))
 
         self.assertEqual(mock_download.call_count, 4)
+
+    @patch("scripts.hf_client.urllib.request.urlopen")
+    def test_poll_queue_process_failed(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.__iter__.return_value = [
+            b'data: {"msg": "process_failed"}\n',
+        ]
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        from scripts.hf_client import _poll_queue
+
+        with self.assertRaises(RuntimeError):
+            _poll_queue("abc")
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("scripts.hf_client.urllib.request.urlopen")

@@ -160,7 +160,10 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     roughness_node.location = (-400, 100)
 
     mask_node = nodes.new(type="ShaderNodeTexImage")
-    mask_node.image = bpy.data.images.load(textures["mask"])
+    try:
+        mask_node.image = bpy.data.images.load(textures["mask"])
+    except Exception as e:
+        raise RuntimeError(f"Failed to load mask map: {e}")
     mask_node.image.colorspace_settings.name = "Non-Color"
     mask_node.location = (-400, -100)
 

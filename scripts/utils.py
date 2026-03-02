@@ -2,27 +2,46 @@ import bpy
 
 def import_plane_from_image(textures):
     """Import a plane and apply the diffuse image as a texture."""
-    if not textures["diffuse"]:
-        print("No diffuse image found!")
-        return
+
+    if not isinstance(textures, dict):
+        raise RuntimeError("Invalid textures payload.")
+
+    diffuse_path = textures.get("diffuse")
+    if not diffuse_path:
+        raise RuntimeError("Diffuse texture missing.")
 
     try:
-        img = bpy.data.images.load(textures["diffuse"])
+        img = bpy.data.images.load(diffuse_path)
     except Exception as e:
-        print(f"[PlaneToPBR] Failed to load diffuse image: {e}")
-        return
+        raise RuntimeError(f"Failed to load diffuse image: {e}")
+
+    if img.size[1] == 0:
+        raise RuntimeError("Invalid image dimensions.")
+
     aspect_ratio = img.size[0] / img.size[1]
     width = 2.0
     height = width / aspect_ratio
 
-    bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
-    plane = bpy.context.active_object
+    try:
+        bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
+        plane = bpy.context.active_object
+    except Exception as e:
+        raise RuntimeError(f"Failed to create plane: {e}")
+
     plane.scale = (width / 2, height / 2, 1)
     plane.name = "PBR_Plane"
 
-    bpy.ops.object.shade_smooth()
+    try:
+        bpy.ops.object.shade_smooth()
+    except Exception:
+        pass  # Not critical
+
     mat = apply_pbr_textures(plane, textures)
-    plane.data.materials.append(mat)
+
+    try:
+        plane.data.materials.append(mat)
+    except Exception as e:
+        raise RuntimeError(f"Failed to assign material: {e}")
 
     add_modifiers(plane, textures)
 

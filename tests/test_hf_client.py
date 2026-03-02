@@ -23,6 +23,43 @@ from scripts.hf_client import (
 
 class TestHFClient(unittest.TestCase):
 
+    @patch("scripts.hf_client._download_results")
+    @patch("scripts.hf_client._poll_queue")
+    @patch("scripts.hf_client._join_queue")
+    @patch("scripts.hf_client._upload_file")
+    @patch("scripts.hf_client._resolve_fn_index")
+    @patch("scripts.hf_client.os.path.exists", return_value=True)
+    @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
+    def test_call_hf_pbr_success(
+            self,
+            mock_file,
+            mock_exists,
+            mock_resolve,
+            mock_upload,
+            mock_join,
+            mock_poll,
+            mock_download,
+    ):
+        mock_resolve.return_value = 0
+        mock_upload.return_value = "uploaded_path"
+        mock_join.return_value = "event123"
+        mock_poll.return_value = [{"url": "d"}, {"url": "n"}, {"url": "r"}, {"url": "m"}]
+        mock_download.return_value = {"depth": "d", "normal": "n", "roughness": "r", "mask": "m",
+                                      "diffuse": "diffuse.png"}
+
+        from scripts.hf_client import call_hf_pbr
+
+        result = call_hf_pbr("fake.png", prompt="brick")
+
+        self.assertIn("depth", result)
+        self.assertEqual(result["diffuse"], "diffuse.png")
+
+        mock_resolve.assert_called_once()
+        mock_upload.assert_called_once()
+        mock_join.assert_called_once()
+        mock_poll.assert_called_once()
+        mock_download.assert_called_once()
+
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_resolve_fn_index_success(self, mock_urlopen):
         mock_response = MagicMock()
@@ -61,6 +98,24 @@ class TestHFClient(unittest.TestCase):
 
         self.assertEqual(result, "evt123")
 
+    @patch("scripts.hf_client._resolve_fn_index")
+    @patch("scripts.hf_client.os.path.exists", return_value=True)
+    @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
+    def test_call_hf_pbr_wraps_exception(
+            self,
+            mock_file,
+            mock_exists,
+            mock_resolve,
+    ):
+        mock_resolve.side_effect = Exception("boom")
+
+        from scripts.hf_client import call_hf_pbr
+
+        with self.assertRaises(RuntimeError) as ctx:
+            call_hf_pbr("fake.png")
+
+        self.assertIn("HF PBR generation failed", str(ctx.exception))
+
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_poll_queue_success(self, mock_urlopen):
         mock_response = MagicMock()
@@ -74,9 +129,7 @@ class TestHFClient(unittest.TestCase):
         self.assertEqual(result, ["a", "b"])
 
     @patch("scripts.hf_client._download_file")
-    @patch("scripts.hf_client.tempfile.gettempdir")
-    def test_download_results(self, mock_tmp, mock_download):
-        mock_tmp.return_value = "/tmp"
+    def test_download_results(self, mock_download):
         mock_download.side_effect = [
             "/tmp/depth.png",
             "/tmp/normal.png",
@@ -98,10 +151,22 @@ class TestHFClient(unittest.TestCase):
         self.assertEqual(textures["roughness"], "/tmp/roughness.png")
         self.assertEqual(textures["mask"], "/tmp/mask.png")
 
-        # Optional: just validate diffuse points into TEXTURE_DIR
         self.assertTrue(textures["diffuse"].endswith("diffuse.png"))
 
         self.assertEqual(mock_download.call_count, 4)
+
+    @patch("scripts.hf_client.urllib.request.urlopen")
+    def test_poll_queue_process_failed(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.__iter__.return_value = [
+            b'data: {"msg": "process_failed"}\n',
+        ]
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        from scripts.hf_client import _poll_queue
+
+        with self.assertRaises(RuntimeError):
+            _poll_queue("abc")
 
     @patch("builtins.open", new_callable=mock_open)
     @patch("scripts.hf_client.urllib.request.urlopen")

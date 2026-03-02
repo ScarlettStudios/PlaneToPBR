@@ -149,7 +149,10 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
 
 def _add_roughness(nodes, links, bsdf, mapping, textures):
     roughness_node = nodes.new(type="ShaderNodeTexImage")
-    roughness_node.image = bpy.data.images.load(textures["roughness"])
+    try:
+        roughness_node.image = bpy.data.images.load(textures["roughness"])
+    except Exception as e:
+        raise RuntimeError(f"Failed to load roughness map: {e}")
     roughness_node.image.colorspace_settings.name = "Non-Color"
     roughness_node.location = (-400, 100)
 

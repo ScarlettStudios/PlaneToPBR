@@ -1,41 +1,58 @@
 import bpy
 
 def import_plane_from_image(textures):
-    """Import a plane and apply the diffuse image as a texture."""
+    """
+    Create a plane in the scene and apply a full PBR material setup
+    based on the provided texture dictionary.
+    """
 
     if not isinstance(textures, dict):
         raise RuntimeError("Invalid textures payload.")
 
+    # Ensure we at least have a diffuse texture
     diffuse_path = textures.get("diffuse")
     if not diffuse_path:
         raise RuntimeError("Diffuse texture missing.")
 
+    # ------------------------------------------------------------
+    # Load diffuse image to calculate aspect ratio
+    # ------------------------------------------------------------
     try:
         img = bpy.data.images.load(diffuse_path)
     except Exception as e:
         raise RuntimeError(f"Failed to load diffuse image: {e}")
 
+    # Prevent divide-by-zero errors
     if img.size[1] == 0:
         raise RuntimeError("Invalid image dimensions.")
 
+    # Maintain correct aspect ratio when scaling plane
     aspect_ratio = img.size[0] / img.size[1]
     width = 2.0
     height = width / aspect_ratio
 
+    # ------------------------------------------------------------
+    # Create base mesh plane
+    # ------------------------------------------------------------
     try:
         bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
         plane = bpy.context.active_object
     except Exception as e:
         raise RuntimeError(f"Failed to create plane: {e}")
 
+    # Scale plane to match texture proportions
     plane.scale = (width / 2, height / 2, 1)
     plane.name = "PBR_Plane"
 
+    # Smooth shading (non-critical if it fails)
     try:
         bpy.ops.object.shade_smooth()
     except Exception:
         pass  # Not critical
 
+    # ------------------------------------------------------------
+    # Create and apply PBR material
+    # ------------------------------------------------------------
     mat = apply_pbr_textures(plane, textures)
 
     try:
@@ -43,42 +60,62 @@ def import_plane_from_image(textures):
     except Exception as e:
         raise RuntimeError(f"Failed to assign material: {e}")
 
+    # ------------------------------------------------------------
+    # Add subdivision + displacement modifiers
+    # ------------------------------------------------------------
     add_modifiers(plane, textures)
 
 def apply_pbr_textures(plane, textures):
+    """
+    Build a node-based Principled BSDF material and attach
+     available texture maps.
+    """
+
+    # Create base node structure
     mat, nodes, links, bsdf, mapping = _create_base_material()
 
+    # Add diffuse/base color
     if textures.get("diffuse"):
         _add_diffuse(nodes, links, bsdf, mapping, textures["diffuse"])
 
+    # Add roughness blended with mask
     if textures.get("roughness") and textures.get("mask"):
         _add_roughness(nodes, links, bsdf, mapping, textures)
 
+    # Add normal map
     if textures.get("normal"):
         _add_normal(nodes, links, bsdf, mapping, textures["normal"])
 
     return mat
 
 def add_modifiers(plane, textures):
+    """
+    Add subdivision and displacement modifiers to the plane.
+    Depth texture (if provided) is used for displacement.
+    """
     try:
+        # High-level subdivision for displacement detail
         bpy.ops.object.modifier_add(type='SUBSURF')
         sub1 = plane.modifiers["Subdivision"]
         sub1.subdivision_type = 'SIMPLE'
         sub1.levels = 6
         sub1.render_levels = 6
 
+        # Secondary subdivision layer
         bpy.ops.object.modifier_add(type='SUBSURF')
         sub2 = plane.modifiers["Subdivision.001"]
         sub2.subdivision_type = 'SIMPLE'
         sub2.levels = 1
         sub2.render_levels = 1
 
+        # Displacement modifier
         bpy.ops.object.modifier_add(type='DISPLACE')
         disp = plane.modifiers["Displace"]
 
     except Exception as e:
         raise RuntimeError(f"Failed to add modifiers: {e}")
 
+    # Apply depth map as displacement texture
     if textures.get("depth"):
         try:
             displacement_texture = bpy.data.textures.new(
@@ -90,6 +127,7 @@ def add_modifiers(plane, textures):
         except Exception as e:
             raise RuntimeError(f"Failed to load depth texture: {e}")
 
+    # Configure displacement settings
     disp.texture_coords = 'UV'
     disp.strength = 1.0
     disp.mid_level = 0.5
@@ -98,6 +136,10 @@ def add_modifiers(plane, textures):
 # ------------------------------------------------------------
 
 def _create_base_material():
+    """
+    Create a clean Principled BSDF node setup:
+        Texture Coordinate → Mapping → Texture Nodes → BSDF → Output
+    """
     try:
         mat = bpy.data.materials.new(name="PBR_Material")
         mat.use_nodes = True
@@ -108,7 +150,7 @@ def _create_base_material():
     links = mat.node_tree.links
     nodes.clear()
 
-    # Output
+    # Material Output node
     output_node = nodes.new(type="ShaderNodeOutputMaterial")
     output_node.location = (1200, 0)
 
@@ -117,7 +159,7 @@ def _create_base_material():
     bsdf.location = (900, 0)
     links.new(bsdf.outputs["BSDF"], output_node.inputs["Surface"])
 
-    # Texture Coordinate
+    # UV Coordinate
     tex_coord = nodes.new(type="ShaderNodeTexCoord")
     tex_coord.location = (-800, 0)
 
@@ -134,6 +176,9 @@ def _create_base_material():
 # ------------------------------------------------------------
 
 def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
+    """
+    Connect diffuse texture to Principled Base Color.
+    """
     try:
         diffuse_node = nodes.new(type="ShaderNodeTexImage")
         diffuse_node.image = bpy.data.images.load(diffuse_path)
@@ -151,7 +196,11 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
 # ------------------------------------------------------------
 
 def _add_roughness(nodes, links, bsdf, mapping, textures):
+    """
+    Blend roughness map with mask to control surface reflectivity.
+    """
     roughness_node = nodes.new(type="ShaderNodeTexImage")
+
     try:
         roughness_node.image = bpy.data.images.load(textures["roughness"])
     except Exception as e:
@@ -167,6 +216,8 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     mask_node.image.colorspace_settings.name = "Non-Color"
     mask_node.location = (-400, -100)
 
+    # Mix node blends roughness with a constant fallback value
+
     mix_node = nodes.new(type="ShaderNodeMixRGB")
     mix_node.location = (100, 100)
 
@@ -174,6 +225,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     links.new(mapping.outputs["Vector"], mask_node.inputs["Vector"])
 
     links.new(roughness_node.outputs["Color"], mix_node.inputs["Color1"])
+    # Default fallback roughness value
     mix_node.inputs["Color2"].default_value = (0.082, 0.082, 0.082, 1)
     links.new(mask_node.outputs["Color"], mix_node.inputs["Fac"])
 
@@ -185,6 +237,9 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
 # ------------------------------------------------------------
 
 def _add_normal(nodes, links, bsdf, mapping, normal_path):
+    """
+    Add normal map to Principled BSDF Normal input.
+    """
     normal_node = nodes.new(type="ShaderNodeTexImage")
     try:
         normal_node.image = bpy.data.images.load(normal_path)

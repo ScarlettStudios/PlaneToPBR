@@ -7,26 +7,54 @@ import socket
 # Leave for tests
 import tempfile
 
+# ------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------
+
+# Maximum time (seconds) for any network request
 REQUEST_TIMEOUT = 120
+
+# Base URL for your Hugging Face Space
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
+
+# Directory setup for saving textures locally inside the add-on
 ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
 TEXTURE_DIR = os.path.join(ADDON_DIR, "textures")
+
+# Ensure texture output directory exists
 os.makedirs(TEXTURE_DIR, exist_ok=True)
 
+
+# ------------------------------------------------------------
+# Main Public Entry Point
+# ------------------------------------------------------------
+
 def call_hf_pbr(image_path, prompt=""):
+    """
+    Send an image to the Hugging Face Space,
+    wait for processing to complete,
+    download generated PBR maps,
+    and return a texture dictionary.
+    """
     try:
+        # Resolve the correct Gradio function index dynamically
         fn_index = _resolve_fn_index("predict")
+        # Unique session identifier for queue polling
         session_hash = uuid.uuid4().hex
 
+        # Validate image exists before proceeding
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
+        # Read image bytes
         with open(image_path, "rb") as f:
             raw_bytes = f.read()
 
+        # Upload file to Space
         uploaded_path = _upload_file(image_path, raw_bytes)
         filename = os.path.basename(image_path)
 
+        # Construct Gradio payload
         payload = {
             "data": [
                 {
@@ -41,25 +69,32 @@ def call_hf_pbr(image_path, prompt=""):
             "session_hash": session_hash
         }
 
-        event_id = _join_queue(payload)
-        print("Joined queue:", event_id)
+        # Join Gradio processing queue
+        _join_queue(payload)
 
+        # Poll until job completes
         output = _poll_queue(session_hash)
 
-        # Save diffuse fallback
+        # Save original image locally as diffuse fallback
         diffuse_path = os.path.join(TEXTURE_DIR, "diffuse.png")
         with open(diffuse_path, "wb") as out:
             out.write(raw_bytes)
 
+        # Download generated PBR outputs
         return _download_results(output)
 
     except Exception as e:
         raise RuntimeError(f"HF PBR generation failed: {e}")
 
+
+# ------------------------------------------------------------
+# Gradio Function Resolution
+# ------------------------------------------------------------
+
 def _resolve_fn_index(api_name="predict"):
     """
-    Resolve the fn_index for a given Gradio api_name
-    from the Space config endpoint.
+    Fetch Space config and determine which fn_index
+    corresponds to the provided api_name.
     """
     try:
         with urllib.request.urlopen(
@@ -87,9 +122,14 @@ def _resolve_fn_index(api_name="predict"):
 
     raise RuntimeError(f"api_name '{api_name}' not found in Space config.")
 
+# ------------------------------------------------------------
+# File Upload
+# ------------------------------------------------------------
+
 def _upload_file(image_path, raw_bytes):
     """
-    Upload a file to the Gradio Space and return the uploaded path.
+    Upload image to Gradio Space file endpoint.
+    Returns uploaded file path used in queue payload.
     """
     boundary = "----Boundary" + uuid.uuid4().hex
     filename = os.path.basename(image_path)
@@ -124,9 +164,14 @@ def _upload_file(image_path, raw_bytes):
 
     return upload_data[0]
 
+
+# ------------------------------------------------------------
+# Queue Join
+# ------------------------------------------------------------
+
 def _join_queue(payload):
     """
-    Join the Gradio queue and return the event_id.
+    Submit payload to Gradio queue and return event_id.
     """
     join_req = urllib.request.Request(
         f"{SPACE_BASE}/gradio_api/queue/join",
@@ -153,10 +198,15 @@ def _join_queue(payload):
 
     return event_id
 
+
+# ------------------------------------------------------------
+# Queue Polling (SSE Stream)
+# ------------------------------------------------------------
+
 def _poll_queue(session_hash):
     """
     Poll the Gradio SSE queue until processing completes.
-    Returns the output data list.
+    Returns the result data list.
     """
 
     poll_url = f"{SPACE_BASE}/gradio_api/queue/data?session_hash={session_hash}"
@@ -166,6 +216,7 @@ def _poll_queue(session_hash):
             for raw_line in resp:
                 line = raw_line.decode().strip()
 
+                # Only process SSE "data:" lines
                 if not line.startswith("data:"):
                     continue
 
@@ -175,6 +226,7 @@ def _poll_queue(session_hash):
 
                 event = json.loads(json_str)
 
+                # Processing completed successfully
                 if event.get("msg") == "process_completed":
                     result_output = event.get("output")
 
@@ -183,6 +235,7 @@ def _poll_queue(session_hash):
                     else:
                         raise RuntimeError(f"Space error: {event}")
 
+                # Processing failed
                 if event.get("msg") == "process_failed":
                     raise RuntimeError(f"Space failed: {event}")
 
@@ -195,7 +248,14 @@ def _poll_queue(session_hash):
 
     raise RuntimeError("No output received from Space.")
 
+# ------------------------------------------------------------
+# Download Generated Results
+# ------------------------------------------------------------
+
 def _download_results(output):
+    """
+    Download all expected PBR maps and return texture dictionary.
+    """
     if not isinstance(output, list) or len(output) < 4:
         raise RuntimeError(f"Unexpected output format: {output}")
 
@@ -219,21 +279,30 @@ def _download_results(output):
 
     return textures
 
+
+# ------------------------------------------------------------
+# File Downloader Helper
+# ------------------------------------------------------------
+
 def _download_file(url, path):
-        try:
-            with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as resp:
-                data = resp.read()
-        except urllib.error.HTTPError as e:
-            raise RuntimeError(f"Download HTTP error: {e.code} {e.reason}")
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"Download connection error: {e.reason}")
-        except socket.timeout:
-            raise RuntimeError("Download timed out.")
+    """
+    Download file from URL and write to disk.
+    Returns local file path.
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as resp:
+            data = resp.read()
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"Download HTTP error: {e.code} {e.reason}")
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Download connection error: {e.reason}")
+    except socket.timeout:
+        raise RuntimeError("Download timed out.")
 
-        try:
-            with open(path, "wb") as f:
-                f.write(data)
-        except OSError as e:
-            raise RuntimeError(f"Failed to write file {path}: {e}")
+    try:
+        with open(path, "wb") as f:
+            f.write(data)
+    except OSError as e:
+        raise RuntimeError(f"Failed to write file {path}: {e}")
 
-        return path
+    return path

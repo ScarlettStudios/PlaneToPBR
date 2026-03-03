@@ -1,6 +1,7 @@
 import os
 import sys
 import types
+import pytest
 
 # Add repo root to sys.path
 HERE = os.path.dirname(__file__)
@@ -92,3 +93,89 @@ def test_apply_pbr_textures_skips_missing_channels(monkeypatch):
     textures = {}  # no channels
 
     result = utils.apply_pbr_textures(None, textures)
+
+def test_import_plane_invalid_payload(monkeypatch):
+    from scripts import utils
+
+    with pytest.raises(RuntimeError, match="Invalid textures payload"):
+        utils.import_plane_from_image(None)
+
+    with pytest.raises(RuntimeError, match="Invalid textures payload"):
+        utils.import_plane_from_image([])
+
+def test_import_plane_missing_diffuse(monkeypatch):
+    from scripts import utils
+
+    with pytest.raises(RuntimeError, match="Diffuse texture missing"):
+        utils.import_plane_from_image({})
+
+def test_import_plane_image_load_failure(monkeypatch):
+    from scripts import utils
+
+    class FakeImages:
+        def load(self, path):
+            raise Exception("load failed")
+
+    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False, )
+
+    textures = {"diffuse": "fake.png"}
+
+    with pytest.raises(RuntimeError, match="Failed to load diffuse image"):
+        utils.import_plane_from_image(textures)
+
+def test_import_plane_zero_height(monkeypatch):
+    from scripts import utils
+
+    class FakeImage:
+        size = (1024, 0)
+
+    class FakeImages:
+        def load(self, path):
+            return FakeImage()
+
+    monkeypatch.setattr(utils.bpy,"data",types.SimpleNamespace(images=FakeImages()),raising=False,)
+
+    textures = {"diffuse": "fake.png"}
+
+    with pytest.raises(RuntimeError, match="Invalid image dimensions"):
+        utils.import_plane_from_image(textures)
+
+def test_import_plane_success_minimal(monkeypatch):
+    class FakeImage:
+        size = (1024, 1024)
+
+    class FakeImages:
+        def load(self, path):
+            return FakeImage()
+
+    class FakePlane:
+        def __init__(self):
+            self.scale = None
+            self.name = None
+            self.data = types.SimpleNamespace(materials=[])
+
+    fake_plane = FakePlane()
+
+    class FakeOps:
+        class mesh:
+            @staticmethod
+            def primitive_plane_add(**kwargs):
+                pass
+
+        class object:
+            @staticmethod
+            def shade_smooth():
+                pass
+
+    monkeypatch.setattr(utils.bpy,"data",types.SimpleNamespace(images=FakeImages()),raising=False,)
+    monkeypatch.setattr(utils.bpy, "ops", FakeOps, raising=False)
+    monkeypatch.setattr(utils.bpy, "context", types.SimpleNamespace(active_object=fake_plane), raising=False)
+
+    monkeypatch.setattr(utils, "apply_pbr_textures", lambda *a, **k: object())
+    monkeypatch.setattr(utils, "add_modifiers", lambda *a, **k: None)
+
+    textures = {"diffuse": "fake.png"}
+
+    utils.import_plane_from_image(textures)
+
+    assert fake_plane.name == "PBR_Plane"

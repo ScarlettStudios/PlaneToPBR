@@ -70,7 +70,6 @@ def apply_pbr_textures(plane, textures):
     Build a node-based Principled BSDF material and attach
      available texture maps.
     """
-
     # Create base node structure
     mat, nodes, links, bsdf, mapping = _create_base_material()
 

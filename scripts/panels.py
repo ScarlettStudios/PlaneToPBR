@@ -3,13 +3,7 @@ import bpy
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """
     UI Panel for the PlaneToPBR add-on.
-
-    Provides:
-    - Prompt input for AI generation
-    - Image path selector
-    - Button to trigger PBR generation operator
     """
-
     # Panel display settings
     bl_label = "Plane to PBR"
     bl_idname = "VIEW3D_PT_planetopbr"

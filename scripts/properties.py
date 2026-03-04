@@ -8,12 +8,7 @@ from bpy.props import StringProperty
 def register():
     """
     Register custom Scene properties used by the PlaneToPBR add-on.
-
-    These properties are accessed by:
-    - The UI Panel (for user input)
-    - The Operator (for execution)
     """
-
     # Text prompt sent to Hugging Face model
     # Used to describe the desired material/surface
     bpy.types.Scene.planetopbr_prompt = StringProperty(

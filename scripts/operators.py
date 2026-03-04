@@ -31,7 +31,6 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     def _run_hf(self, filepath, prompt):
         """
         Runs in a separate thread to avoid blocking Blender UI.
-
         Calls the HF Space and stores results or error.
         """
         try:
@@ -95,10 +94,6 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     def modal(self, context, event):
         """
         Runs repeatedly while operator is active.
-
-        - Updates progress bar
-        - Checks if background thread is done
-        - Imports textures when ready
         """
         if event.type == 'TIMER':
             wm = context.window_manager

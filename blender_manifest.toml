@@ -3,7 +3,7 @@ schema_version = "1.0.0"
 id = "planetopbr"
 name = "Plane to PBR"
 version = "0.1.0"
-tagline = "Add>Mesh>Import an image as a PBR-textured plane"
+tagline = "Generate PBR materials from an image using AI"
 type = "add-on"
 
 maintainer = "Amelia Scarlett"
@@ -12,4 +12,5 @@ license = ["SPDX:GPL-3.0-or-later"]
 blender_version_min = "4.2.0"
 
 [permissions]
-files = "Read texture files from disk"
+network = "Send image to Hugging Face Space for AI processing"
+files = "Read source image and save generated texture maps"

@@ -26,11 +26,11 @@ This allows artists to quickly convert reference images into usable **3D texture
 3. Click **Get Extensions**
 4. Open the dropdown menu and select **Install from Disk**
 
-![Install from Disk](assets/install disk.png)
+![Install from Disk](assets/installDisk.png)
 
 5. Select the `PlaneToPBR.zip` file
 
-![Select Zip](assets/install zip.png)
+![Select Zip](assets/installZip.png)
 
 6. Enable the extension after installation.
 
@@ -70,7 +70,7 @@ Windows
 
 Click the file browser button and select your source image.
 
-![File Browser](assets/select file.png)
+![File Browser](assets/selectFile.png)
 
 Then choose the image file.
 

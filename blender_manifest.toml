@@ -2,7 +2,7 @@ schema_version = "1.0.0"
 
 id = "planetopbr"
 name = "Plane to PBR"
-version = "0.1.0"
+version = "1.0.0"
 
 tagline = "Generate a fully textured PBR plane from a single image"
 

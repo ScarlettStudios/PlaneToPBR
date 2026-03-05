@@ -3,13 +3,19 @@ schema_version = "1.0.0"
 id = "planetopbr"
 name = "Plane to PBR"
 version = "0.1.0"
-tagline = "Generate PBR materials from an image using AI"
+
+tagline = "Generate a fully textured PBR plane from a single image"
+
 type = "add-on"
 
 maintainer = "Amelia Scarlett"
 license = ["SPDX:GPL-3.0-or-later"]
 
+website = "https://github.com/ScarlettStudios/PlaneToPBR"
+
 blender_version_min = "4.2.0"
+
+tags = ["Mesh", "Material", "Import-Export"]
 
 [permissions]
 network = "Send image to Hugging Face Space for AI processing"

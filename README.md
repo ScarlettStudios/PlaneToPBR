@@ -139,5 +139,3 @@ PlaneToPBR relies on several open-source AI models:
 ## License
 
 GPL-3.0-or-later
-
-

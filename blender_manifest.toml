@@ -8,7 +8,7 @@ tagline = "Generate a fully textured PBR plane from a single image"
 
 type = "add-on"
 
-maintainer = "Amelia Scarlett"
+maintainer = "Amelia Scarlett, Josh Shilts (Scarlett Studios)"
 license = ["SPDX:GPL-3.0-or-later"]
 
 website = "https://github.com/ScarlettStudios/PlaneToPBR"

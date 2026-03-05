@@ -18,3 +18,36 @@ jobs:
 
       - name: Run tests
         run: docker run --rm planetopbr-ci
+
+  package:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create extension zip
+        run: |
+          zip -r planetopbr.zip \
+            __init__.py \
+            blender_manifest.toml \
+            README.md \
+            LICENSE \
+            scripts \
+            assets
+
+      - name: Validate zip structure
+        run: |
+          unzip -l planetopbr.zip
+
+          if unzip -l planetopbr.zip | grep -q "PlaneToPBR-main"; then
+            echo "Zip contains nested repository folder"
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: planetopbr-extension
+          path: planetopbr.zip

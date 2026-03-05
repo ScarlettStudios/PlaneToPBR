@@ -10,13 +10,15 @@ The extension automatically generates and applies:
 - Normal
 - Roughness
 - Depth
-- Prompt Bases Mask
+- Prompt-based segmentation mask
 
 This allows artists to quickly convert reference images into usable **3D textured geometry**.
 
+Compatible with Blender 4.2 and newer.
+
 ---
 
-# Installation
+## Installation
 
 1. Open **Blender**
 2. Go to **Edit → Preferences**
@@ -36,14 +38,14 @@ This allows artists to quickly convert reference images into usable **3D texture
 
 ---
 
-# Using PlaneToPBR
+## Using PlaneToPBR
 
 After installing, open the **PlaneToPBR panel** in the 3D viewport sidebar.
 
 ![Panel Location](assets/panel.png)
 
 ---
-# UI Location
+## UI Location
 
 The panel is located in the **3D viewport sidebar**.
 
@@ -52,7 +54,7 @@ The panel is located in the **3D viewport sidebar**.
 ---
 
 
-## Step 1 — Enter Prompt
+### Step 1 — Enter Prompt
 
 Optionally enter a prompt to guide the AI segmentation.
 
@@ -66,7 +68,7 @@ Windows
 
 ---
 
-## Step 2 — Select Image
+### Step 2 — Select Image
 
 Click the file browser button and select your source image.
 
@@ -78,7 +80,7 @@ Then choose the image file.
 
 ---
 
-## Step 3 — Generate PBR Plane
+### Step 3 — Generate PBR Plane
 
 Click **Generate PBR Plane**.
 
@@ -93,7 +95,7 @@ The add-on will:
 
 ---
 
-# Generated Shader
+## Generated Shader
 
 The extension automatically builds a full **PBR shader network**.
 
@@ -101,7 +103,7 @@ The extension automatically builds a full **PBR shader network**.
 
 ---
 
-# Geometry Setup
+## Geometry Setup
 
 For best depth results, adjust modifiers:
 
@@ -114,38 +116,13 @@ Example settings:
 
 ---
 
+## Network Usage
 
-# Running Tests
+PlaneToPBR sends the selected image to a remote AI inference service hosted on Hugging Face in order to generate PBR texture maps.
 
-Build the test container:
+Only the image selected by the user is transmitted.  
+No Blender project data or personal information is collected or stored.
 
-```
-podman build --no-cache -t planetopbr-tests .
-```
-
-or
-
-```
-docker build --no-cache -t planetopbr-tests .
-```
-
-Run tests:
-
-```
-podman run --rm planetopbr-tests
-```
-
-or
-
-```
-docker run --rm planetopbr-tests
-```
-
----
-
-# License
-
-MIT License
 
 ---
 
@@ -158,3 +135,9 @@ PlaneToPBR relies on several open-source AI models:
 | **CLIPSeg** | Text-guided segmentation (mask generation) | https://github.com/timojl/clipseg |
 | **DeepBump** | Normal & roughness map generation | https://github.com/HugoTini/DeepBump |
 | **MiDaS** | Depth estimation | https://github.com/isl-org/MiDaS |
+
+## License
+
+GPL-3.0-or-later
+
+

@@ -1,5 +1,10 @@
 # PlaneToPBR — One-Click PBR Plane Generator for Blender
 
+![Blender](https://img.shields.io/badge/Blender-4.2%2B-orange)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue)
+![Status](https://img.shields.io/badge/status-active-success)
+![Release](https://img.shields.io/github/v/release/ScarlettStudios/PlaneToPBR)
+
 ![PlaneToPBR Demo](assets/PlanetoPBR.gif)
 
 PlaneToPBR is a free Blender extension that generates a **fully textured PBR plane from a single image in one click**.

@@ -9,6 +9,9 @@
 
 PlaneToPBR is a free Blender extension that generates a **fully textured PBR plane from a single image in one click**.
 
+Watch the full demo video here:
+https://youtu.be/AtydKv722z8
+
 The extension automatically generates and applies:
 
 - Diffuse

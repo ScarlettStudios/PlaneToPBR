@@ -1,3 +1,4 @@
+import os
 import bpy
 
 def import_plane_from_image(textures):
@@ -64,6 +65,24 @@ def import_plane_from_image(textures):
     # Add subdivision + displacement modifiers
     # ------------------------------------------------------------
     add_modifiers(plane, textures)
+
+def get_project_texture_dir():
+    """
+    Return the PlaneToPBR texture output directory
+    inside the current Blender project folder.
+    """
+
+    if not bpy.data.filepath:
+        raise RuntimeError(
+            "Please save the Blender project before generating textures."
+        )
+
+    project_dir = bpy.path.abspath("//")
+    textures_dir = os.path.join(project_dir, "PlaneToPBR_textures")
+
+    os.makedirs(textures_dir, exist_ok=True)
+
+    return textures_dir
 
 def apply_pbr_textures(plane, textures):
     """

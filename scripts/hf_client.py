@@ -4,6 +4,8 @@ import json
 import os
 import uuid
 import socket
+import bpy
+from datetime import datetime
 # Leave for tests
 import tempfile
 
@@ -17,14 +19,6 @@ REQUEST_TIMEOUT = 120
 # Base URL for your Hugging Face Space
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 
-# Directory setup for saving textures locally inside the add-on
-ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
-TEXTURE_DIR = os.path.join(ADDON_DIR, "textures")
-
-# Ensure texture output directory exists
-os.makedirs(TEXTURE_DIR, exist_ok=True)
-
-
 # ------------------------------------------------------------
 # Main Public Entry Point
 # ------------------------------------------------------------
@@ -37,6 +31,16 @@ def call_hf_pbr(image_path, prompt=""):
     and return a texture dictionary.
     """
     try:
+        project_dir = bpy.path.abspath("//")
+
+        if not bpy.data.filepath:
+            raise RuntimeError("Please save the Blender project before generating textures.")
+
+        textures_dir = os.path.join(project_dir, "PlaneToPBR_textures")
+        os.makedirs(textures_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
         # Resolve the correct Gradio function index dynamically
         fn_index = _resolve_fn_index("predict")
         # Unique session identifier for queue polling
@@ -76,12 +80,12 @@ def call_hf_pbr(image_path, prompt=""):
         output = _poll_queue(session_hash)
 
         # Save original image locally as diffuse fallback
-        diffuse_path = os.path.join(TEXTURE_DIR, "diffuse.png")
+        diffuse_path = os.path.join(textures_dir, f"diffuse_{timestamp}.png")
         with open(diffuse_path, "wb") as out:
             out.write(raw_bytes)
 
         # Download generated PBR outputs
-        return _download_results(output)
+        return _download_results(output, textures_dir, timestamp, diffuse_path)
 
     except Exception as e:
         raise RuntimeError(f"HF PBR generation failed: {e}")
@@ -252,25 +256,25 @@ def _poll_queue(session_hash):
 # Download Generated Results
 # ------------------------------------------------------------
 
-def _download_results(output):
+def _download_results(output, textures_dir, timestamp, diffuse_path):
     """
     Download all expected PBR maps and return texture dictionary.
     """
     if not isinstance(output, list) or len(output) < 4:
         raise RuntimeError(f"Unexpected output format: {output}")
 
-    output_dir = TEXTURE_DIR
+    output_dir = textures_dir
 
     try:
-        depth = _download_file(output[0]["url"], os.path.join(output_dir, "depth.png"))
-        normal = _download_file(output[1]["url"], os.path.join(output_dir, "normal.png"))
-        roughness = _download_file(output[2]["url"], os.path.join(output_dir, "roughness.png"))
-        mask = _download_file(output[3]["url"], os.path.join(output_dir, "mask.png"))
+        depth = _download_file(output[0]["url"], os.path.join(output_dir, f"depth_{timestamp}.png"))
+        normal = _download_file(output[1]["url"], os.path.join(output_dir, f"normal_{timestamp}.png"))
+        roughness = _download_file(output[2]["url"], os.path.join(output_dir, f"roughness_{timestamp}.png"))
+        mask = _download_file(output[3]["url"], os.path.join(output_dir, f"mask_{timestamp}.png"))
     except KeyError as e:
         raise RuntimeError(f"Missing expected output field: {e}")
 
     textures = {
-        "diffuse": os.path.join(TEXTURE_DIR, "diffuse.png"),
+        "diffuse": diffuse_path,
         "depth": depth,
         "normal": normal,
         "roughness": roughness,

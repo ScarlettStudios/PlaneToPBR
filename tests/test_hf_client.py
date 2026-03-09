@@ -25,7 +25,8 @@ class TestHFClient(unittest.TestCase):
 
     @patch("scripts.hf_client._download_results")
     @patch("scripts.hf_client._poll_queue")
-    @patch("scripts.hf_client.urllib.request.urlopen")
+    @patch("scripts.hf_client._join_queue")
+    @patch("scripts.hf_client._upload_file")
     @patch("scripts.hf_client._resolve_fn_index")
     @patch("scripts.hf_client.os.path.exists", return_value=True)
     @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
@@ -34,22 +35,21 @@ class TestHFClient(unittest.TestCase):
             mock_file,
             mock_exists,
             mock_resolve,
-            mock_urlopen,
+            mock_upload,
+            mock_join,
             mock_poll,
             mock_download,
     ):
-        # Mock HTTP response from queue/join
-        mock_response = MagicMock()
-        mock_response.read.return_value = b"{}"
-        mock_urlopen.return_value.__enter__.return_value = mock_response
-
         mock_resolve.return_value = 0
+        mock_upload.return_value = "/tmp/uploaded.png"
+        mock_join.return_value = "event123"
 
-        mock_poll.return_value = {
-            "output": {
-                "data": [{"url": "d"}, {"url": "n"}, {"url": "r"}, {"url": "m"}]
-            }
-        }
+        mock_poll.return_value = [
+            {"url": "d"},
+            {"url": "n"},
+            {"url": "r"},
+            {"url": "m"},
+        ]
 
         mock_download.return_value = {
             "depth": "d",
@@ -67,8 +67,11 @@ class TestHFClient(unittest.TestCase):
         self.assertEqual(result["diffuse"], "diffuse.png")
 
         mock_resolve.assert_called_once()
+        mock_upload.assert_called_once()
+        mock_join.assert_called_once()
         mock_poll.assert_called_once()
         mock_download.assert_called_once()
+
 
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_resolve_fn_index_success(self, mock_urlopen):

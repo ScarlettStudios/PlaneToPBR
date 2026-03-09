@@ -4,7 +4,6 @@ import json
 import os
 import uuid
 import socket
-#import bpy
 from datetime import datetime
 # Leave for tests
 import tempfile

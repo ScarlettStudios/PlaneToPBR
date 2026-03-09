@@ -30,141 +30,54 @@ def call_hf_pbr(image_path, output_dir, prompt=""):
     download generated PBR maps,
     and return a texture dictionary.
     """
-
     try:
         os.makedirs(output_dir, exist_ok=True)
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        # Resolve correct Gradio function index
         fn_index = _resolve_fn_index("predict")
-
-        # Unique queue session identifier
         session_hash = uuid.uuid4().hex
 
-        # Validate image exists
         if not os.path.exists(image_path):
             raise RuntimeError(f"Input image not found: {image_path}")
 
-        # Upload image
-        upload_data = {
-            "data": [None],
+        with open(image_path, "rb") as f:
+            raw_bytes = f.read()
+
+        uploaded_path = _upload_file(image_path, raw_bytes)
+        filename = os.path.basename(image_path)
+
+        payload = {
+            "data": [
+                {
+                    "path": uploaded_path,
+                    "orig_name": filename,
+                    "size": len(raw_bytes),
+                    "mime_type": "image/png",
+                },
+                prompt or "",
+            ],
             "event_data": None,
             "fn_index": fn_index,
             "session_hash": session_hash,
         }
 
-        # If a prompt exists include it
-        if prompt:
-            upload_data["data"] = [image_path, prompt]
-        else:
-            upload_data["data"] = [image_path, ""]
-
-        upload_request = urllib.request.Request(
-            f"{SPACE_BASE}/queue/join",
-            data=json.dumps(upload_data).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-        )
-
-        with urllib.request.urlopen(upload_request, timeout=REQUEST_TIMEOUT) as resp:
-            _ = resp.read()
-
-        # Poll queue until result ready
-        result = _poll_queue(session_hash)
-
-        if not result:
-            raise RuntimeError("Hugging Face Space returned no result.")
-
-        # Extract output payload
-        output = result.get("output", {}).get("data")
+        _join_queue(payload)
+        output = _poll_queue(session_hash)  # already list
 
         if not output:
-            raise RuntimeError("Invalid response from Hugging Face Space.")
+            raise RuntimeError("Hugging Face Space returned no result.")
 
-        # Download textures
-        textures = _download_results(output, output_dir, timestamp)
+        diffuse_path = os.path.join(output_dir, f"diffuse_{timestamp}.png")
+        with open(diffuse_path, "wb") as out:
+            out.write(raw_bytes)
 
-        return textures
+        return _download_results(output, output_dir, timestamp, diffuse_path)
 
     except urllib.error.URLError as e:
         raise RuntimeError(f"Network error contacting Hugging Face Space: {e}")
-
     except socket.timeout:
         raise RuntimeError("Request to Hugging Face Space timed out.")
-
     except Exception as e:
         raise RuntimeError(f"PBR generation failed: {e}")
-
-# def call_hf_pbr(image_path, prompt=""):
-#     """
-#     Send an image to the Hugging Face Space,
-#     wait for processing to complete,
-#     download generated PBR maps,
-#     and return a texture dictionary.
-#     """
-#     try:
-#         if bpy:
-#             if not bpy.data.filepath:
-#                 raise RuntimeError("Please save the Blender project before generating textures.")
-#
-#             project_dir = bpy.path.abspath("//")
-#         else:
-#             # running outside Blender (tests / CI)
-#             project_dir = os.getcwd()
-#
-#         textures_dir = os.path.join(project_dir, "PlaneToPBR_textures")
-#         os.makedirs(textures_dir, exist_ok=True)
-#
-#         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-#
-#         # Resolve the correct Gradio function index dynamically
-#         fn_index = _resolve_fn_index("predict")
-#         # Unique session identifier for queue polling
-#         session_hash = uuid.uuid4().hex
-#
-#         # Validate image exists before proceeding
-#         if not os.path.exists(image_path):
-#             raise FileNotFoundError(f"Image not found: {image_path}")
-#
-#         # Read image bytes
-#         with open(image_path, "rb") as f:
-#             raw_bytes = f.read()
-#
-#         # Upload file to Space
-#         uploaded_path = _upload_file(image_path, raw_bytes)
-#         filename = os.path.basename(image_path)
-#
-#         # Construct Gradio payload
-#         payload = {
-#             "data": [
-#                 {
-#                     "path": uploaded_path,
-#                     "orig_name": filename,
-#                     "size": len(raw_bytes),
-#                     "mime_type": "image/png",
-#                 },
-#                 prompt,
-#             ],
-#             "fn_index": fn_index,
-#             "session_hash": session_hash
-#         }
-#
-#         # Join Gradio processing queue
-#         _join_queue(payload)
-#
-#         # Poll until job completes
-#         output = _poll_queue(session_hash)
-#
-#         # Save original image locally as diffuse fallback
-#         diffuse_path = os.path.join(textures_dir, f"diffuse_{timestamp}.png")
-#         with open(diffuse_path, "wb") as out:
-#             out.write(raw_bytes)
-#
-#         # Download generated PBR outputs
-#         return _download_results(output, textures_dir, timestamp, diffuse_path)
-#
-#     except Exception as e:
-#         raise RuntimeError(f"HF PBR generation failed: {e}")
 
 
 # ------------------------------------------------------------

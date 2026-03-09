@@ -4,6 +4,7 @@ import json
 import os
 import uuid
 import socket
+from datetime import datetime
 # Leave for tests
 import tempfile
 
@@ -17,19 +18,11 @@ REQUEST_TIMEOUT = 120
 # Base URL for your Hugging Face Space
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 
-# Directory setup for saving textures locally inside the add-on
-ADDON_DIR = os.path.dirname(os.path.abspath(__file__))
-TEXTURE_DIR = os.path.join(ADDON_DIR, "textures")
-
-# Ensure texture output directory exists
-os.makedirs(TEXTURE_DIR, exist_ok=True)
-
-
 # ------------------------------------------------------------
 # Main Public Entry Point
 # ------------------------------------------------------------
 
-def call_hf_pbr(image_path, prompt=""):
+def call_hf_pbr(image_path, output_dir, prompt=""):
     """
     Send an image to the Hugging Face Space,
     wait for processing to complete,
@@ -37,24 +30,20 @@ def call_hf_pbr(image_path, prompt=""):
     and return a texture dictionary.
     """
     try:
-        # Resolve the correct Gradio function index dynamically
+        os.makedirs(output_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         fn_index = _resolve_fn_index("predict")
-        # Unique session identifier for queue polling
         session_hash = uuid.uuid4().hex
 
-        # Validate image exists before proceeding
         if not os.path.exists(image_path):
-            raise FileNotFoundError(f"Image not found: {image_path}")
+            raise RuntimeError(f"Input image not found: {image_path}")
 
-        # Read image bytes
         with open(image_path, "rb") as f:
             raw_bytes = f.read()
 
-        # Upload file to Space
         uploaded_path = _upload_file(image_path, raw_bytes)
         filename = os.path.basename(image_path)
 
-        # Construct Gradio payload
         payload = {
             "data": [
                 {
@@ -63,28 +52,31 @@ def call_hf_pbr(image_path, prompt=""):
                     "size": len(raw_bytes),
                     "mime_type": "image/png",
                 },
-                prompt,
+                prompt or "",
             ],
+            "event_data": None,
             "fn_index": fn_index,
-            "session_hash": session_hash
+            "session_hash": session_hash,
         }
 
-        # Join Gradio processing queue
         _join_queue(payload)
+        output = _poll_queue(session_hash)  # already list
 
-        # Poll until job completes
-        output = _poll_queue(session_hash)
+        if not output:
+            raise RuntimeError("Hugging Face Space returned no result.")
 
-        # Save original image locally as diffuse fallback
-        diffuse_path = os.path.join(TEXTURE_DIR, "diffuse.png")
+        diffuse_path = os.path.join(output_dir, f"diffuse_{timestamp}.png")
         with open(diffuse_path, "wb") as out:
             out.write(raw_bytes)
 
-        # Download generated PBR outputs
-        return _download_results(output)
+        return _download_results(output, output_dir, timestamp, diffuse_path)
 
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}")
+    except socket.timeout:
+        raise RuntimeError("Request to Hugging Face Space timed out.")
     except Exception as e:
-        raise RuntimeError(f"HF PBR generation failed: {e}")
+        raise RuntimeError(f"PBR generation failed: {e}")
 
 
 # ------------------------------------------------------------
@@ -252,25 +244,25 @@ def _poll_queue(session_hash):
 # Download Generated Results
 # ------------------------------------------------------------
 
-def _download_results(output):
+def _download_results(output, textures_dir, timestamp, diffuse_path):
     """
     Download all expected PBR maps and return texture dictionary.
     """
     if not isinstance(output, list) or len(output) < 4:
         raise RuntimeError(f"Unexpected output format: {output}")
 
-    output_dir = TEXTURE_DIR
+    output_dir = textures_dir
 
     try:
-        depth = _download_file(output[0]["url"], os.path.join(output_dir, "depth.png"))
-        normal = _download_file(output[1]["url"], os.path.join(output_dir, "normal.png"))
-        roughness = _download_file(output[2]["url"], os.path.join(output_dir, "roughness.png"))
-        mask = _download_file(output[3]["url"], os.path.join(output_dir, "mask.png"))
+        depth = _download_file(output[0]["url"], os.path.join(output_dir, f"depth_{timestamp}.png"))
+        normal = _download_file(output[1]["url"], os.path.join(output_dir, f"normal_{timestamp}.png"))
+        roughness = _download_file(output[2]["url"], os.path.join(output_dir, f"roughness_{timestamp}.png"))
+        mask = _download_file(output[3]["url"], os.path.join(output_dir, f"mask_{timestamp}.png"))
     except KeyError as e:
         raise RuntimeError(f"Missing expected output field: {e}")
 
     textures = {
-        "diffuse": os.path.join(TEXTURE_DIR, "diffuse.png"),
+        "diffuse": diffuse_path,
         "depth": depth,
         "normal": normal,
         "roughness": roughness,

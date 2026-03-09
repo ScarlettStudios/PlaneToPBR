@@ -18,11 +18,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        run: docker build -t planetopbr-ci .
+      - name: Build Docker image (forced fresh)
+        run: docker build --pull --no-cache -t planetopbr-ci:${{ github.sha }} .
 
       - name: Run tests
-        run: docker run --rm planetopbr-ci
+        run: docker run --rm planetopbr-ci:${{ github.sha }}
 
   package:
     runs-on: ubuntu-latest

@@ -41,15 +41,27 @@ class TestHFClient(unittest.TestCase):
             mock_download,
     ):
         mock_resolve.return_value = 0
-        mock_upload.return_value = "uploaded_path"
+        mock_upload.return_value = "/tmp/uploaded.png"
         mock_join.return_value = "event123"
-        mock_poll.return_value = [{"url": "d"}, {"url": "n"}, {"url": "r"}, {"url": "m"}]
-        mock_download.return_value = {"depth": "d", "normal": "n", "roughness": "r", "mask": "m",
-                                      "diffuse": "diffuse.png"}
+
+        mock_poll.return_value = [
+            {"url": "d"},
+            {"url": "n"},
+            {"url": "r"},
+            {"url": "m"},
+        ]
+
+        mock_download.return_value = {
+            "depth": "d",
+            "normal": "n",
+            "roughness": "r",
+            "mask": "m",
+            "diffuse": "diffuse.png",
+        }
 
         from scripts.hf_client import call_hf_pbr
 
-        result = call_hf_pbr("fake.png", prompt="brick")
+        result = call_hf_pbr("fake.png", "/tmp", prompt="brick")
 
         self.assertIn("depth", result)
         self.assertEqual(result["diffuse"], "diffuse.png")
@@ -59,6 +71,7 @@ class TestHFClient(unittest.TestCase):
         mock_join.assert_called_once()
         mock_poll.assert_called_once()
         mock_download.assert_called_once()
+
 
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_resolve_fn_index_success(self, mock_urlopen):
@@ -112,9 +125,9 @@ class TestHFClient(unittest.TestCase):
         from scripts.hf_client import call_hf_pbr
 
         with self.assertRaises(RuntimeError) as ctx:
-            call_hf_pbr("fake.png")
+            call_hf_pbr("fake.png", "/tmp")
 
-        self.assertIn("HF PBR generation failed", str(ctx.exception))
+        self.assertIn("PBR generation failed", str(ctx.exception))
 
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_poll_queue_success(self, mock_urlopen):
@@ -144,15 +157,19 @@ class TestHFClient(unittest.TestCase):
             {"url": "m"},
         ]
 
-        textures = _download_results(output)
+        textures = _download_results(
+            output,
+            "/tmp",
+            "123",
+            "/tmp/diffuse_123.png"
+        )
 
         self.assertEqual(textures["depth"], "/tmp/depth.png")
         self.assertEqual(textures["normal"], "/tmp/normal.png")
         self.assertEqual(textures["roughness"], "/tmp/roughness.png")
         self.assertEqual(textures["mask"], "/tmp/mask.png")
 
-        self.assertTrue(textures["diffuse"].endswith("diffuse.png"))
-
+        self.assertEqual(textures["diffuse"], "/tmp/diffuse_123.png")
         self.assertEqual(mock_download.call_count, 4)
 
     @patch("scripts.hf_client.urllib.request.urlopen")

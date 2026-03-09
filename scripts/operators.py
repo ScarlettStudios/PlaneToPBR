@@ -2,7 +2,7 @@ import bpy
 import threading
 
 from .hf_client import call_hf_pbr
-from .utils import import_plane_from_image
+from .utils import import_plane_from_image, get_project_texture_dir
 
 class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     """
@@ -34,7 +34,13 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
         Calls the HF Space and stores results or error.
         """
         try:
-            self._textures = call_hf_pbr(filepath, prompt=prompt)
+            textures_dir = get_project_texture_dir()
+
+            self._textures = call_hf_pbr(
+                image_path=filepath,
+                output_dir=textures_dir,
+                prompt=prompt
+            )
         except Exception as e:
             self._textures = None
             self._error_message = str(e)

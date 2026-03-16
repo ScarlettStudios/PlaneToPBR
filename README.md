@@ -124,6 +124,20 @@ Example settings:
 
 ---
 
+## TODO
+
+- [x] Refactored the project into a proper Blender extension
+- [x] Added the Blender UI panel and client layer
+- [x] Added unit tests and release packaging
+- [ ] Finish RunPod / new backend integration
+- [ ] Document the full Blender → backend workflow
+- [ ] Improve error handling and progress reporting
+- [ ] Improve mask quality for difficult materials
+- [ ] Add token / billing support for hosted generation
+- [ ] Add an Unreal Engine extension version
+
+---
+
 ## Network Usage
 
 PlaneToPBR sends the selected image to a remote AI inference service hosted on Hugging Face in order to generate PBR texture maps.

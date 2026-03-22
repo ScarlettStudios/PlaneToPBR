@@ -2,6 +2,7 @@ import os
 import sys
 import types
 import pytest
+from unittest.mock import patch, mock_open
 
 # Add repo root to sys.path
 HERE = os.path.dirname(__file__)
@@ -606,3 +607,70 @@ def test_add_normal_load_failure(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to load normal map"):
         utils._add_normal(nodes, links, bsdf, mapping, "normal.png")
+
+
+# ------------------------------------------------------------
+# call_hf_pbr tests
+# ------------------------------------------------------------
+
+@patch("scripts.utils._download_results")
+@patch("scripts.utils._poll_queue")
+@patch("scripts.utils._join_queue")
+@patch("scripts.utils._upload_file")
+@patch("scripts.utils._resolve_fn_index")
+@patch("scripts.utils.os.path.exists", return_value=True)
+@patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
+def test_call_hf_pbr_success(
+        mock_file,
+        mock_exists,
+        mock_resolve,
+        mock_upload,
+        mock_join,
+        mock_poll,
+        mock_download,
+):
+    mock_resolve.return_value = 0
+    mock_upload.return_value = "/tmp/uploaded.png"
+    mock_join.return_value = "event123"
+
+    mock_poll.return_value = [
+        {"url": "d"},
+        {"url": "n"},
+        {"url": "r"},
+        {"url": "m"},
+    ]
+
+    mock_download.return_value = {
+        "depth": "d",
+        "normal": "n",
+        "roughness": "r",
+        "mask": "m",
+        "diffuse": "diffuse.png",
+    }
+
+    result = utils.call_hf_pbr("fake.png", "/tmp", prompt="brick")
+
+    assert "depth" in result
+    assert result["diffuse"] == "diffuse.png"
+
+    mock_resolve.assert_called_once()
+    mock_upload.assert_called_once()
+    mock_join.assert_called_once()
+    mock_poll.assert_called_once()
+    mock_download.assert_called_once()
+
+
+@patch("scripts.utils._resolve_fn_index")
+@patch("scripts.utils.os.path.exists", return_value=True)
+@patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
+def test_call_hf_pbr_wraps_exception(
+        mock_file,
+        mock_exists,
+        mock_resolve,
+):
+    mock_resolve.side_effect = Exception("boom")
+
+    with pytest.raises(RuntimeError) as ctx:
+        utils.call_hf_pbr("fake.png", "/tmp")
+
+    assert "PBR generation failed" in str(ctx.value)

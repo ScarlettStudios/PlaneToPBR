@@ -1,8 +1,7 @@
 import bpy
 import threading
 
-from .hf_client import call_hf_pbr
-from .utils import import_plane_from_image, get_project_texture_dir, call_platform_pbr
+from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr, call_platform_pbr
 
 class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     """

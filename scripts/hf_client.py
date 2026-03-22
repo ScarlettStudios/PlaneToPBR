@@ -4,9 +4,6 @@ import json
 import os
 import uuid
 import socket
-from datetime import datetime
-# Leave for tests
-import tempfile
 
 # ------------------------------------------------------------
 # Configuration
@@ -19,64 +16,8 @@ REQUEST_TIMEOUT = 120
 SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 
 # ------------------------------------------------------------
-# Main Public Entry Point
+# Public API (low-level helpers exported for use in utils.py)
 # ------------------------------------------------------------
-
-def call_hf_pbr(image_path, output_dir, prompt=""):
-    """
-    Send an image to the Hugging Face Space,
-    wait for processing to complete,
-    download generated PBR maps,
-    and return a texture dictionary.
-    """
-    try:
-        os.makedirs(output_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        fn_index = _resolve_fn_index("predict")
-        session_hash = uuid.uuid4().hex
-
-        if not os.path.exists(image_path):
-            raise RuntimeError(f"Input image not found: {image_path}")
-
-        with open(image_path, "rb") as f:
-            raw_bytes = f.read()
-
-        uploaded_path = _upload_file(image_path, raw_bytes)
-        filename = os.path.basename(image_path)
-
-        payload = {
-            "data": [
-                {
-                    "path": uploaded_path,
-                    "orig_name": filename,
-                    "size": len(raw_bytes),
-                    "mime_type": "image/png",
-                },
-                prompt or "",
-            ],
-            "event_data": None,
-            "fn_index": fn_index,
-            "session_hash": session_hash,
-        }
-
-        _join_queue(payload)
-        output = _poll_queue(session_hash)  # already list
-
-        if not output:
-            raise RuntimeError("Hugging Face Space returned no result.")
-
-        diffuse_path = os.path.join(output_dir, f"diffuse_{timestamp}.png")
-        with open(diffuse_path, "wb") as out:
-            out.write(raw_bytes)
-
-        return _download_results(output, output_dir, timestamp, diffuse_path)
-
-    except urllib.error.URLError as e:
-        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}")
-    except socket.timeout:
-        raise RuntimeError("Request to Hugging Face Space timed out.")
-    except Exception as e:
-        raise RuntimeError(f"PBR generation failed: {e}")
 
 
 # ------------------------------------------------------------

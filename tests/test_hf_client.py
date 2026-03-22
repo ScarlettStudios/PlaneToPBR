@@ -23,56 +23,6 @@ from scripts.hf_client import (
 
 class TestHFClient(unittest.TestCase):
 
-    @patch("scripts.hf_client._download_results")
-    @patch("scripts.hf_client._poll_queue")
-    @patch("scripts.hf_client._join_queue")
-    @patch("scripts.hf_client._upload_file")
-    @patch("scripts.hf_client._resolve_fn_index")
-    @patch("scripts.hf_client.os.path.exists", return_value=True)
-    @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
-    def test_call_hf_pbr_success(
-            self,
-            mock_file,
-            mock_exists,
-            mock_resolve,
-            mock_upload,
-            mock_join,
-            mock_poll,
-            mock_download,
-    ):
-        mock_resolve.return_value = 0
-        mock_upload.return_value = "/tmp/uploaded.png"
-        mock_join.return_value = "event123"
-
-        mock_poll.return_value = [
-            {"url": "d"},
-            {"url": "n"},
-            {"url": "r"},
-            {"url": "m"},
-        ]
-
-        mock_download.return_value = {
-            "depth": "d",
-            "normal": "n",
-            "roughness": "r",
-            "mask": "m",
-            "diffuse": "diffuse.png",
-        }
-
-        from scripts.hf_client import call_hf_pbr
-
-        result = call_hf_pbr("fake.png", "/tmp", prompt="brick")
-
-        self.assertIn("depth", result)
-        self.assertEqual(result["diffuse"], "diffuse.png")
-
-        mock_resolve.assert_called_once()
-        mock_upload.assert_called_once()
-        mock_join.assert_called_once()
-        mock_poll.assert_called_once()
-        mock_download.assert_called_once()
-
-
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_resolve_fn_index_success(self, mock_urlopen):
         mock_response = MagicMock()
@@ -110,24 +60,6 @@ class TestHFClient(unittest.TestCase):
         result = _join_queue(payload)
 
         self.assertEqual(result, "evt123")
-
-    @patch("scripts.hf_client._resolve_fn_index")
-    @patch("scripts.hf_client.os.path.exists", return_value=True)
-    @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
-    def test_call_hf_pbr_wraps_exception(
-            self,
-            mock_file,
-            mock_exists,
-            mock_resolve,
-    ):
-        mock_resolve.side_effect = Exception("boom")
-
-        from scripts.hf_client import call_hf_pbr
-
-        with self.assertRaises(RuntimeError) as ctx:
-            call_hf_pbr("fake.png", "/tmp")
-
-        self.assertIn("PBR generation failed", str(ctx.exception))
 
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_poll_queue_success(self, mock_urlopen):

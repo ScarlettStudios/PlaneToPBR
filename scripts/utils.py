@@ -1,5 +1,8 @@
 import os
+import time
+import zipfile
 import bpy
+from .platform_client import PlatformClient, PlatformClientError
 
 def import_plane_from_image(textures):
     """
@@ -83,6 +86,86 @@ def get_project_texture_dir():
     os.makedirs(textures_dir, exist_ok=True)
 
     return textures_dir
+
+
+def call_platform_pbr(image_path, output_dir, prompt, email, password):
+    """
+    Call the ScarlettStudios Platform API to generate PBR textures.
+
+    Handles login, job creation, polling, download, and extraction.
+    Returns a dictionary of texture file paths.
+
+    Args:
+        image_path: Path to input image
+        output_dir: Directory to save extracted textures
+        prompt: Text prompt for PBR generation
+        email: Platform API email credential
+        password: Platform API password credential
+
+    Returns:
+        dict: Texture paths (base_color, normal, roughness, metallic)
+
+    Raises:
+        PlatformClientError: On API failures
+        RuntimeError: On processing failures
+    """
+    # Initialize platform client
+    client = PlatformClient()
+
+    # Login
+    client.login(email=email, password=password)
+
+    # Create PBR job
+    job_response = client.create_pbr_job(
+        image_path=image_path,
+        prompt=prompt,
+        output_format="png",
+        return_mask=True
+    )
+
+    job_id = job_response.get("job_id")
+    if not job_id:
+        raise PlatformClientError("No job_id returned from create_pbr_job")
+
+    # Poll for job completion
+    max_attempts = 60
+    attempt = 0
+    while attempt < max_attempts:
+        status_response = client.get_job_status(job_id)
+        status = status_response.get("status")
+
+        if status == "completed":
+            download_url = status_response.get("download_url")
+            if not download_url:
+                raise PlatformClientError("Job completed but no download_url provided")
+
+            # Download results
+            output_zip = os.path.join(output_dir, f"{job_id}.zip")
+            client.download_results(download_url, output_zip)
+
+            # Extract textures
+            extract_dir = os.path.join(output_dir, job_id)
+            os.makedirs(extract_dir, exist_ok=True)
+            with zipfile.ZipFile(output_zip, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+
+            # Build texture dictionary (adjust based on actual file naming)
+            return {
+                "base_color": os.path.join(extract_dir, "base_color.png"),
+                "normal": os.path.join(extract_dir, "normal.png"),
+                "roughness": os.path.join(extract_dir, "roughness.png"),
+                "metallic": os.path.join(extract_dir, "metallic.png"),
+            }
+
+        elif status == "failed":
+            error_msg = status_response.get("error", "Job failed without error message")
+            raise PlatformClientError(f"PBR job failed: {error_msg}")
+
+        # Still processing, wait and retry
+        time.sleep(2)
+        attempt += 1
+
+    raise PlatformClientError("Job polling timeout: max attempts reached")
 
 def apply_pbr_textures(plane, textures):
     """

@@ -40,17 +40,33 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
         layout.separator()
 
         # ------------------------------------------------------------
-        # Generate Button
+        # Platform API Credentials Section
+        # ------------------------------------------------------------
+        box = layout.box()
+        box.label(text="Platform API Credentials")
+
+        # Email and password fields for platform authentication
+        box.prop(scene, "planetopbr_email")
+        box.prop(scene, "planetopbr_password")
+
+        layout.separator()
+
+        # ------------------------------------------------------------
+        # Generate Buttons
         # ------------------------------------------------------------
 
-        # Calls the async operator that:
-        # 1. Sends image to HF
-        # 2. Waits for results
-        # 3. Imports plane with textures
+        # HuggingFace button
         layout.operator(
             "object.import_plane_from_image",
-            text="Generate PBR Plane",
-            icon='MATERIAL'
+            text="Generate PBR (HuggingFace)",
+            icon='COMMUNITY'
+        )
+
+        # Platform API button
+        layout.operator(
+            "object.import_plane_from_platform",
+            text="Generate PBR (Platform)",
+            icon='WORLD'
         )
 
 # ------------------------------------------------------------

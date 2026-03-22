@@ -1,8 +1,18 @@
 import os
 import time
 import zipfile
+import urllib.error
+import socket
+from datetime import datetime
 import bpy
 from .platform_client import PlatformClient, PlatformClientError
+from .hf_client import (
+    _resolve_fn_index,
+    _upload_file,
+    _join_queue,
+    _poll_queue,
+    _download_results,
+)
 
 def import_plane_from_image(textures):
     """
@@ -86,6 +96,74 @@ def get_project_texture_dir():
     os.makedirs(textures_dir, exist_ok=True)
 
     return textures_dir
+
+
+def call_hf_pbr(image_path, output_dir, prompt=""):
+    """
+    Call the Hugging Face Space to generate PBR textures.
+
+    Handles upload, job submission, polling, and download.
+    Returns a dictionary of texture file paths.
+
+    Args:
+        image_path: Path to input image
+        output_dir: Directory to save extracted textures
+        prompt: Text prompt for PBR generation
+
+    Returns:
+        dict: Texture paths (diffuse, depth, normal, roughness, mask)
+
+    Raises:
+        RuntimeError: On processing failures
+    """
+    try:
+        os.makedirs(output_dir, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fn_index = _resolve_fn_index("predict")
+        session_hash = __import__("uuid").uuid4().hex
+
+        if not os.path.exists(image_path):
+            raise RuntimeError(f"Input image not found: {image_path}")
+
+        with open(image_path, "rb") as f:
+            raw_bytes = f.read()
+
+        uploaded_path = _upload_file(image_path, raw_bytes)
+        filename = os.path.basename(image_path)
+
+        payload = {
+            "data": [
+                {
+                    "path": uploaded_path,
+                    "orig_name": filename,
+                    "size": len(raw_bytes),
+                    "mime_type": "image/png",
+                },
+                prompt or "",
+            ],
+            "event_data": None,
+            "fn_index": fn_index,
+            "session_hash": session_hash,
+        }
+
+        _join_queue(payload)
+        output = _poll_queue(session_hash)
+
+        if not output:
+            raise RuntimeError("Hugging Face Space returned no result.")
+
+        diffuse_path = os.path.join(output_dir, f"diffuse_{timestamp}.png")
+        with open(diffuse_path, "wb") as out:
+            out.write(raw_bytes)
+
+        return _download_results(output, output_dir, timestamp, diffuse_path)
+
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}")
+    except socket.timeout:
+        raise RuntimeError("Request to Hugging Face Space timed out.")
+    except Exception as e:
+        raise RuntimeError(f"PBR generation failed: {e}")
 
 
 def call_platform_pbr(image_path, output_dir, prompt, email, password):

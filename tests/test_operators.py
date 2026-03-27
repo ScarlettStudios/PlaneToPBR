@@ -21,7 +21,12 @@ mock_bpy.utils = types.SimpleNamespace(register_class=lambda x: None,
 
 sys.modules["bpy"] = mock_bpy
 
-from scripts.operators import OBJECT_OT_import_plane_from_image
+from scripts.operators import (
+    OBJECT_OT_import_plane_from_image,
+    OBJECT_OT_import_plane_from_platform,
+    PLANETOPBR_OT_platform_login,
+    PLANETOPBR_OT_platform_logout,
+)
 
 
 class TestOperators(unittest.TestCase):
@@ -30,6 +35,7 @@ class TestOperators(unittest.TestCase):
         context = MagicMock()
         context.scene.planetopbr_prompt = "brick"
         context.scene.planetopbr_image_path = image_path
+        context.preferences.addons = {}
 
         context.window_manager.progress_begin = MagicMock()
         context.window_manager.progress_update = MagicMock()
@@ -40,6 +46,22 @@ class TestOperators(unittest.TestCase):
 
         context.window = MagicMock()
         return context
+
+    def _add_preferences(self, context, **overrides):
+        prefs = types.SimpleNamespace(
+            platform_email="user@example.com",
+            platform_password="secret",
+            platform_access_token="access_123",
+            platform_refresh_token="refresh_456",
+            platform_account_email="user@example.com",
+            platform_logged_in=True,
+        )
+
+        for key, value in overrides.items():
+            setattr(prefs, key, value)
+
+        context.preferences.addons["scripts"] = types.SimpleNamespace(preferences=prefs)
+        return prefs
 
     # --------------------------------------------------
     # 1️⃣ execute() no image guard
@@ -250,6 +272,118 @@ class TestOperators(unittest.TestCase):
         self.assertTrue(op._done)
         self.assertEqual(op._error_message, "HF API error")
         self.assertIsNone(op._textures)
+
+    @patch("scripts.operators.PlatformClient")
+    def test_platform_login_operator_success(self, mock_client_cls):
+        context = self._mock_context()
+        prefs = self._add_preferences(
+            context,
+            platform_access_token="",
+            platform_refresh_token="",
+            platform_logged_in=False,
+        )
+
+        client = mock_client_cls.return_value
+        client.access_token = "new_access"
+        client.refresh_token = "new_refresh"
+        client.get_me.return_value = {"email": "artist@example.com"}
+
+        op = PLANETOPBR_OT_platform_login()
+        op.report = MagicMock()
+
+        result = op.execute(context)
+
+        self.assertEqual(result, {'FINISHED'})
+        client.login.assert_called_once_with(email="user@example.com", password="secret")
+        self.assertEqual(prefs.platform_access_token, "new_access")
+        self.assertEqual(prefs.platform_refresh_token, "new_refresh")
+        self.assertEqual(prefs.platform_account_email, "artist@example.com")
+        self.assertEqual(prefs.platform_password, "")
+        self.assertTrue(prefs.platform_logged_in)
+
+    def test_platform_logout_operator_clears_login_state(self):
+        context = self._mock_context()
+        prefs = self._add_preferences(context)
+
+        op = PLANETOPBR_OT_platform_logout()
+        op.report = MagicMock()
+
+        result = op.execute(context)
+
+        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(prefs.platform_access_token, "")
+        self.assertEqual(prefs.platform_refresh_token, "")
+        self.assertEqual(prefs.platform_account_email, "")
+        self.assertEqual(prefs.platform_password, "")
+        self.assertFalse(prefs.platform_logged_in)
+
+    def test_platform_execute_requires_login(self):
+        context = self._mock_context()
+        self._add_preferences(
+            context,
+            platform_access_token="",
+            platform_refresh_token="",
+            platform_logged_in=False,
+        )
+
+        op = OBJECT_OT_import_plane_from_platform()
+        op.report = MagicMock()
+
+        result = op.execute(context)
+
+        self.assertEqual(result, {'CANCELLED'})
+        op.report.assert_called_once()
+        self.assertIn("login required", op.report.call_args[0][1].lower())
+
+    @patch("scripts.operators.call_platform_pbr")
+    @patch("scripts.operators.get_project_texture_dir")
+    def test_run_platform_success_uses_saved_tokens(self, mock_get_dir, mock_call_platform):
+        mock_get_dir.return_value = "/fake/textures"
+        mock_call_platform.return_value = (
+            {"diffuse": "path/to/diffuse.png"},
+            {"access_token": "refreshed_access", "refresh_token": "refresh_456"},
+        )
+
+        op = OBJECT_OT_import_plane_from_platform()
+        op._run_platform_api("fake.png", "brick", "access_123", "refresh_456")
+
+        self.assertTrue(op._platform_done)
+        self.assertEqual(op._textures, {"diffuse": "path/to/diffuse.png"})
+        self.assertEqual(op._updated_auth_state["access_token"], "refreshed_access")
+        mock_call_platform.assert_called_once_with(
+            image_path="fake.png",
+            output_dir="/fake/textures",
+            prompt="brick",
+            access_token="access_123",
+            refresh_token="refresh_456",
+        )
+
+    def test_platform_modal_persists_refreshed_tokens(self):
+        context = self._mock_context()
+        prefs = self._add_preferences(context)
+
+        op = OBJECT_OT_import_plane_from_platform()
+        op._platform_done = True
+        op._error_message = None
+        op._textures = {"diffuse": "x"}
+        op._updated_auth_state = {
+            "access_token": "new_access",
+            "refresh_token": "new_refresh",
+        }
+        op._timer = "timer"
+        op.report = MagicMock()
+
+        event = MagicMock()
+        event.type = "TIMER"
+
+        with patch("scripts.operators.import_plane_from_image") as mock_import:
+            result = op.modal(context, event)
+
+        self.assertEqual(result, {'FINISHED'})
+        mock_import.assert_called_once()
+        self.assertEqual(prefs.platform_access_token, "new_access")
+        self.assertEqual(prefs.platform_refresh_token, "new_refresh")
+        self.assertTrue(prefs.platform_logged_in)
 
 
 if __name__ == "__main__":

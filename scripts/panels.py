@@ -1,5 +1,19 @@
 import bpy
 
+
+def _get_addon_preferences(context):
+    addon_key = __package__.split(".")[0] if __package__ else __name__.split(".")[0]
+    addons = getattr(getattr(context, "preferences", None), "addons", None)
+
+    if addons is None:
+        return None
+
+    addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
+    if addon_entry is None:
+        return None
+
+    return getattr(addon_entry, "preferences", None)
+
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """
     UI Panel for the PlaneToPBR add-on.
@@ -40,18 +54,6 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
         layout.separator()
 
         # ------------------------------------------------------------
-        # Platform API Credentials Section
-        # ------------------------------------------------------------
-        box = layout.box()
-        box.label(text="Platform API Credentials")
-
-        # Email and password fields for platform authentication
-        box.prop(scene, "planetopbr_email")
-        box.prop(scene, "planetopbr_password")
-
-        layout.separator()
-
-        # ------------------------------------------------------------
         # Generate Buttons
         # ------------------------------------------------------------
 
@@ -65,9 +67,18 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
         # Platform API button
         layout.operator(
             "object.import_plane_from_platform",
-            text="Generate PBR (Platform)",
+            text="Generate PBR Pro (GPU)",
             icon='WORLD'
         )
+
+        prefs = _get_addon_preferences(context)
+        if prefs and prefs.platform_logged_in and prefs.platform_access_token:
+            layout.label(
+                text=f"PBR Pro signed in as {prefs.platform_account_email or prefs.platform_email}",
+                icon='CHECKMARK'
+            )
+        else:
+            layout.label(text="PBR Pro login is in Add-on Preferences.", icon='INFO')
 
 # ------------------------------------------------------------
 # Registration

@@ -2,6 +2,81 @@ import bpy
 import threading
 
 from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr, call_platform_pbr
+from .platform_client import PlatformClient, PlatformClientError
+
+
+def _get_addon_preferences(context):
+    addon_key = __package__.split(".")[0] if __package__ else __name__.split(".")[0]
+    addons = getattr(getattr(context, "preferences", None), "addons", None)
+
+    if addons is None:
+        raise RuntimeError("Unable to access Blender add-on preferences.")
+
+    addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
+    if addon_entry is None or getattr(addon_entry, "preferences", None) is None:
+        raise RuntimeError("PlaneToPBR preferences are unavailable.")
+
+    return addon_entry.preferences
+
+
+class PLANETOPBR_OT_platform_login(bpy.types.Operator):
+    """Authenticate the Scarlett Studios platform account from add-on preferences."""
+
+    bl_idname = "planetopbr.platform_login"
+    bl_label = "PlaneToPBR Platform Login"
+
+    def execute(self, context):
+        try:
+            prefs = _get_addon_preferences(context)
+            email = getattr(prefs, "platform_email", "").strip()
+            password = getattr(prefs, "platform_password", "")
+
+            if not email or not password:
+                self.report({'ERROR'}, "Enter your email and password in Add-on Preferences.")
+                return {'CANCELLED'}
+
+            client = PlatformClient()
+            client.login(email=email, password=password)
+
+            try:
+                account = client.get_me()
+                account_email = account.get("email") or email
+            except PlatformClientError:
+                account_email = email
+
+            prefs.platform_email = account_email
+            prefs.platform_account_email = account_email
+            prefs.platform_access_token = client.access_token or ""
+            prefs.platform_refresh_token = client.refresh_token or ""
+            prefs.platform_logged_in = True
+            prefs.platform_password = ""
+
+            self.report({'INFO'}, f"Signed in as {account_email}")
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
+
+
+class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
+    """Clear the persisted Scarlett Studios platform session."""
+
+    bl_idname = "planetopbr.platform_logout"
+    bl_label = "PlaneToPBR Platform Logout"
+
+    def execute(self, context):
+        try:
+            prefs = _get_addon_preferences(context)
+            prefs.platform_access_token = ""
+            prefs.platform_refresh_token = ""
+            prefs.platform_account_email = ""
+            prefs.platform_password = ""
+            prefs.platform_logged_in = False
+            self.report({'INFO'}, "Logged out of PlaneToPBR Pro.")
+            return {'FINISHED'}
+        except Exception as e:
+            self.report({'ERROR'}, str(e))
+            return {'CANCELLED'}
 
 class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     """
@@ -155,11 +230,12 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
     _textures = None  # Stores returned texture dictionary
     _progress = 0  # Fake progress indicator value
     _error_message = None  # Stores error from background thread
+    _updated_auth_state = None  # Stores refreshed auth tokens
 
     # ------------------------------------------------------------
     # Background Thread
     # ------------------------------------------------------------
-    def _run_platform_api(self, filepath, prompt, email, password):
+    def _run_platform_api(self, filepath, prompt, access_token, refresh_token):
         """
         Runs in a separate thread to avoid blocking Blender UI.
         Calls the Platform API and stores results or error.
@@ -167,12 +243,12 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
         try:
             textures_dir = get_project_texture_dir()
 
-            self._textures = call_platform_pbr(
+            self._textures, self._updated_auth_state = call_platform_pbr(
                 image_path=filepath,
                 output_dir=textures_dir,
                 prompt=prompt,
-                email=email,
-                password=password
+                access_token=access_token,
+                refresh_token=refresh_token,
             )
         except Exception as e:
             self._textures = None
@@ -199,12 +275,12 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 self.report({'ERROR'}, "No image selected")
                 return {'CANCELLED'}
 
-            # Get platform API credentials (should be stored in scene properties)
-            email = getattr(context.scene, 'planetopbr_email', '')
-            password = getattr(context.scene, 'planetopbr_password', '')
+            prefs = _get_addon_preferences(context)
+            access_token = getattr(prefs, "platform_access_token", "")
+            refresh_token = getattr(prefs, "platform_refresh_token", "")
 
-            if not email or not password:
-                self.report({'ERROR'}, "Platform API credentials not configured")
+            if not access_token:
+                self.report({'ERROR'}, "PlaneToPBR Pro login required in Add-on Preferences.")
                 return {'CANCELLED'}
 
             # Reset runtime state
@@ -212,11 +288,12 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             self._textures = None
             self._progress = 0
             self._error_message = None
+            self._updated_auth_state = None
 
             # Start platform API background thread (non-blocking)
             self._platform_thread = threading.Thread(
                 target=self._run_platform_api,
-                args=(image_path, prompt, email, password),
+                args=(image_path, prompt, access_token, refresh_token),
                 daemon=True
             )
             self._platform_thread.start()
@@ -260,6 +337,12 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 self.report({'ERROR'}, self._error_message)
                 return {'CANCELLED'}
 
+            if self._updated_auth_state:
+                prefs = _get_addon_preferences(context)
+                prefs.platform_access_token = self._updated_auth_state.get("access_token", "")
+                prefs.platform_refresh_token = self._updated_auth_state.get("refresh_token", "")
+                prefs.platform_logged_in = bool(prefs.platform_access_token)
+
             # Attempt to import generated textures
             try:
                 if self._textures:
@@ -283,10 +366,14 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
 
 def register():
     """Register the operators with Blender."""
+    bpy.utils.register_class(PLANETOPBR_OT_platform_login)
+    bpy.utils.register_class(PLANETOPBR_OT_platform_logout)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_platform)
 
 def unregister():
     """Unregister the operators from Blender."""
-    bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_platform)
+    bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
+    bpy.utils.unregister_class(PLANETOPBR_OT_platform_logout)
+    bpy.utils.unregister_class(PLANETOPBR_OT_platform_login)

@@ -15,13 +15,23 @@ if REPO_ROOT not in sys.path:
 # --------------------------------------------------
 
 mock_bpy = types.ModuleType("bpy")
-mock_bpy.types = types.SimpleNamespace(Operator=object)
+mock_bpy.types = types.SimpleNamespace(Operator=object, AddonPreferences=object)
+mock_bpy.props = types.SimpleNamespace(
+    BoolProperty=lambda **kwargs: None,
+    StringProperty=lambda **kwargs: None,
+)
 mock_bpy.utils = types.SimpleNamespace(register_class=lambda x: None,
                                        unregister_class=lambda x: None)
 
 sys.modules["bpy"] = mock_bpy
+sys.modules["bpy.props"] = mock_bpy.props
 
-from scripts.operators import OBJECT_OT_import_plane_from_image
+from scripts.operators import (
+    OBJECT_OT_import_plane_from_image,
+    OBJECT_OT_import_plane_from_platform,
+    PLANETOPBR_OT_login_platform,
+    PLANETOPBR_OT_logout_platform,
+)
 
 
 class TestOperators(unittest.TestCase):
@@ -30,6 +40,7 @@ class TestOperators(unittest.TestCase):
         context = MagicMock()
         context.scene.planetopbr_prompt = "brick"
         context.scene.planetopbr_image_path = image_path
+        context.preferences = MagicMock()
 
         context.window_manager.progress_begin = MagicMock()
         context.window_manager.progress_update = MagicMock()
@@ -40,6 +51,16 @@ class TestOperators(unittest.TestCase):
 
         context.window = MagicMock()
         return context
+
+    def _mock_preferences(self, logged_in=False, email="pro@example.com", password="secret"):
+        return types.SimpleNamespace(
+            planetopbr_logged_in=logged_in,
+            planetopbr_email=email,
+            planetopbr_password=password,
+            planetopbr_access_token="access-token" if logged_in else "",
+            planetopbr_refresh_token="refresh-token" if logged_in else "",
+            planetopbr_login_status="Not logged in",
+        )
 
     # --------------------------------------------------
     # 1️⃣ execute() no image guard
@@ -250,6 +271,117 @@ class TestOperators(unittest.TestCase):
         self.assertTrue(op._done)
         self.assertEqual(op._error_message, "HF API error")
         self.assertIsNone(op._textures)
+
+    @patch("scripts.operators.get_addon_preferences")
+    @patch("scripts.operators._restore_platform_session")
+    def test_platform_execute_requires_login(self, mock_restore_session, mock_get_prefs):
+        from scripts.platform_client import PlatformAuthError
+
+        op = OBJECT_OT_import_plane_from_platform()
+        context = self._mock_context()
+        mock_get_prefs.return_value = self._mock_preferences(logged_in=False)
+        mock_restore_session.side_effect = PlatformAuthError("Log in from Preferences.")
+        op.report = MagicMock()
+
+        result = op.execute(context)
+
+        self.assertEqual(result, {'CANCELLED'})
+        self.assertIn("Log in", op.report.call_args[0][1])
+
+    @patch("scripts.operators.threading.Thread")
+    @patch("scripts.operators.get_addon_preferences")
+    @patch("scripts.operators._restore_platform_session")
+    def test_platform_execute_starts_thread_when_logged_in(self, mock_restore_session, mock_get_prefs, mock_thread):
+        op = OBJECT_OT_import_plane_from_platform()
+        context = self._mock_context()
+        preferences = self._mock_preferences(logged_in=True)
+        mock_get_prefs.return_value = preferences
+        mock_restore_session.return_value = object()
+        mock_thread.return_value = MagicMock(start=MagicMock())
+        op.report = MagicMock()
+
+        result = op.execute(context)
+
+        self.assertEqual(result, {'RUNNING_MODAL'})
+        mock_thread.assert_called_once()
+        context.window_manager.progress_begin.assert_called_once()
+
+    @patch("scripts.operators.PlatformClient")
+    @patch("scripts.operators.get_addon_preferences")
+    def test_login_operator_success(self, mock_get_prefs, mock_client_cls):
+        preferences = self._mock_preferences(logged_in=False)
+        mock_get_prefs.return_value = preferences
+        mock_client = MagicMock()
+        mock_client.access_token = "new-access"
+        mock_client.refresh_token = "new-refresh"
+        mock_client_cls.return_value = mock_client
+        op = PLANETOPBR_OT_login_platform()
+        op.report = MagicMock()
+
+        result = op.execute(self._mock_context())
+
+        self.assertEqual(result, {'FINISHED'})
+        self.assertTrue(preferences.planetopbr_logged_in)
+        self.assertEqual(preferences.planetopbr_login_status, "Logged in as pro@example.com")
+        self.assertEqual(preferences.planetopbr_access_token, "new-access")
+        self.assertEqual(preferences.planetopbr_refresh_token, "new-refresh")
+        mock_client.login.assert_called_once_with(email="pro@example.com", password="secret")
+
+    @patch("scripts.operators.get_addon_preferences")
+    def test_logout_operator_clears_login_state(self, mock_get_prefs):
+        preferences = self._mock_preferences(logged_in=True)
+        mock_get_prefs.return_value = preferences
+        op = PLANETOPBR_OT_logout_platform()
+        op.report = MagicMock()
+
+        result = op.execute(self._mock_context())
+
+        self.assertEqual(result, {'FINISHED'})
+        self.assertFalse(preferences.planetopbr_logged_in)
+        self.assertEqual(preferences.planetopbr_login_status, "Not logged in")
+        self.assertEqual(preferences.planetopbr_access_token, "")
+        self.assertEqual(preferences.planetopbr_refresh_token, "")
+
+    @patch("scripts.operators.PlatformClient")
+    def test_restore_platform_session_uses_saved_tokens(self, mock_client_cls):
+        from scripts.operators import _restore_platform_session
+
+        preferences = self._mock_preferences(logged_in=True)
+        mock_client = MagicMock()
+        mock_client.access_token = "access-token"
+        mock_client.refresh_token = "refresh-token"
+        mock_client_cls.return_value = mock_client
+
+        result = _restore_platform_session(preferences)
+
+        self.assertIs(result, mock_client)
+        mock_client.get_me.assert_called_once()
+        mock_client.login.assert_not_called()
+
+    @patch("scripts.operators.PlatformClient")
+    def test_restore_platform_session_falls_back_to_login(self, mock_client_cls):
+        from scripts.operators import _restore_platform_session
+        from scripts.platform_client import PlatformAuthError
+
+        preferences = self._mock_preferences(logged_in=True)
+        expired_client = MagicMock()
+        expired_client.access_token = "access-token"
+        expired_client.refresh_token = "refresh-token"
+        expired_client.get_me.side_effect = PlatformAuthError("expired")
+
+        login_client = MagicMock()
+        login_client.access_token = "fresh-access"
+        login_client.refresh_token = "fresh-refresh"
+
+        mock_client_cls.side_effect = [expired_client, login_client]
+
+        result = _restore_platform_session(preferences)
+
+        self.assertIs(result, login_client)
+        login_client.login.assert_called_once_with(email="pro@example.com", password="secret")
+        self.assertTrue(preferences.planetopbr_logged_in)
+        self.assertEqual(preferences.planetopbr_access_token, "fresh-access")
+        self.assertEqual(preferences.planetopbr_refresh_token, "fresh-refresh")
 
 
 if __name__ == "__main__":

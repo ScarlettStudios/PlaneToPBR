@@ -88,7 +88,7 @@ def get_project_texture_dir():
     return textures_dir
 
 
-def call_platform_pbr(image_path, output_dir, prompt, email, password):
+def call_platform_pbr(image_path, output_dir, prompt, email=None, password=None, client=None):
     """
     Call the ScarlettStudios Platform API to generate PBR textures.
 
@@ -101,6 +101,7 @@ def call_platform_pbr(image_path, output_dir, prompt, email, password):
         prompt: Text prompt for PBR generation
         email: Platform API email credential
         password: Platform API password credential
+        client: Optional authenticated PlatformClient instance
 
     Returns:
         dict: Texture paths (base_color, normal, roughness, metallic)
@@ -109,11 +110,11 @@ def call_platform_pbr(image_path, output_dir, prompt, email, password):
         PlatformClientError: On API failures
         RuntimeError: On processing failures
     """
-    # Initialize platform client
-    client = PlatformClient()
-
-    # Login
-    client.login(email=email, password=password)
+    if client is None:
+        client = PlatformClient()
+        if not email or not password:
+            raise PlatformClientError("Platform API credentials not configured")
+        client.login(email=email, password=password)
 
     # Create PBR job
     job_response = client.create_pbr_job(

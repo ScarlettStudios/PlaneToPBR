@@ -81,6 +81,7 @@ class PlatformClient:
             raise PlatformAuthError("Refresh response missing access_token.")
 
         self.access_token = access_token
+        self.refresh_token = response.get("refresh_token", self.refresh_token)
         return response
 
     def get_balance(self) -> Dict:

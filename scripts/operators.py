@@ -2,7 +2,91 @@ import bpy
 import threading
 
 from .hf_client import call_hf_pbr
+from .platform_client import PlatformAuthError, PlatformClient
+from .properties import (
+    clear_platform_session,
+    get_addon_preferences,
+    store_platform_session,
+)
 from .utils import import_plane_from_image, get_project_texture_dir, call_platform_pbr
+
+
+def _build_platform_client(preferences):
+    client = PlatformClient()
+    access_token = preferences.planetopbr_access_token.strip()
+    refresh_token = preferences.planetopbr_refresh_token.strip()
+    client.access_token = access_token or None
+    client.refresh_token = refresh_token or None
+    return client
+
+
+def _restore_platform_session(preferences):
+    client = _build_platform_client(preferences)
+
+    if client.access_token or client.refresh_token:
+        try:
+            if client.access_token:
+                client.get_me()
+            else:
+                client.refresh_access_token()
+                client.get_me()
+
+            store_platform_session(preferences, preferences.planetopbr_email.strip(), client)
+            return client
+        except PlatformAuthError:
+            clear_platform_session(preferences, status="Saved session expired. Log in again.")
+
+    email = preferences.planetopbr_email.strip()
+    password = preferences.planetopbr_password
+    if not email or not password:
+        raise PlatformAuthError("No saved session is available. Log in from Preferences.")
+
+    client = PlatformClient()
+    client.login(email=email, password=password)
+    store_platform_session(preferences, email, client)
+    return client
+
+
+class PLANETOPBR_OT_login_platform(bpy.types.Operator):
+    bl_idname = "planetopbr.login_platform"
+    bl_label = "Log In"
+    bl_description = "Verify Platform API credentials and unlock Pro generation"
+
+    def execute(self, context):
+        preferences = get_addon_preferences(context)
+
+        try:
+            email = preferences.planetopbr_email.strip()
+            password = preferences.planetopbr_password
+
+            if not email or not password:
+                preferences.planetopbr_logged_in = False
+                preferences.planetopbr_login_status = "Enter both email and password."
+                self.report({'ERROR'}, "Enter both email and password")
+                return {'CANCELLED'}
+
+            client = PlatformClient()
+            client.login(email=email, password=password)
+            store_platform_session(preferences, email, client)
+            self.report({'INFO'}, "Platform login successful")
+            return {'FINISHED'}
+
+        except Exception as exc:
+            clear_platform_session(preferences, status=f"Login failed: {exc}")
+            self.report({'ERROR'}, f"Login failed: {exc}")
+            return {'CANCELLED'}
+
+
+class PLANETOPBR_OT_logout_platform(bpy.types.Operator):
+    bl_idname = "planetopbr.logout_platform"
+    bl_label = "Log Out"
+    bl_description = "Lock Pro generation until credentials are verified again"
+
+    def execute(self, context):
+        preferences = get_addon_preferences(context)
+        clear_platform_session(preferences)
+        self.report({'INFO'}, "Platform login cleared")
+        return {'FINISHED'}
 
 class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     """
@@ -24,6 +108,7 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     _textures = None  # Stores returned texture dictionary
     _progress = 0  # Fake progress indicator value
     _error_message = None  # Stores error from background thread
+    _session_tokens = None  # Stores refreshed session tokens from background thread
 
     # ------------------------------------------------------------
     # Background Thread
@@ -160,7 +245,7 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
     # ------------------------------------------------------------
     # Background Thread
     # ------------------------------------------------------------
-    def _run_platform_api(self, filepath, prompt, email, password):
+    def _run_platform_api(self, filepath, prompt, client):
         """
         Runs in a separate thread to avoid blocking Blender UI.
         Calls the Platform API and stores results or error.
@@ -172,9 +257,12 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 image_path=filepath,
                 output_dir=textures_dir,
                 prompt=prompt,
-                email=email,
-                password=password
+                client=client,
             )
+            self._session_tokens = {
+                "access_token": client.access_token or "",
+                "refresh_token": client.refresh_token or "",
+            }
         except Exception as e:
             self._textures = None
             self._error_message = str(e)
@@ -200,24 +288,20 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 self.report({'ERROR'}, "No image selected")
                 return {'CANCELLED'}
 
-            # Get platform API credentials (should be stored in scene properties)
-            email = getattr(context.scene, 'planetopbr_email', '')
-            password = getattr(context.scene, 'planetopbr_password', '')
-
-            if not email or not password:
-                self.report({'ERROR'}, "Platform API credentials not configured")
-                return {'CANCELLED'}
+            preferences = get_addon_preferences(context)
+            client = _restore_platform_session(preferences)
 
             # Reset runtime state
             self._platform_done = False
             self._textures = None
             self._progress = 0
             self._error_message = None
+            self._session_tokens = None
 
             # Start platform API background thread (non-blocking)
             self._platform_thread = threading.Thread(
                 target=self._run_platform_api,
-                args=(image_path, prompt, email, password),
+                args=(image_path, prompt, client),
                 daemon=True
             )
             self._platform_thread.start()
@@ -245,6 +329,7 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
         """
         if event.type == 'TIMER':
             wm = context.window_manager
+            preferences = get_addon_preferences(context)
 
             # While Platform API processing is still running
             if not self._platform_done:
@@ -256,8 +341,17 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             wm.event_timer_remove(self._timer)
             wm.progress_end()
 
+            if self._session_tokens:
+                preferences.planetopbr_access_token = self._session_tokens["access_token"]
+                preferences.planetopbr_refresh_token = self._session_tokens["refresh_token"]
+                preferences.planetopbr_logged_in = True
+                if preferences.planetopbr_email.strip():
+                    preferences.planetopbr_login_status = f"Logged in as {preferences.planetopbr_email.strip()}"
+
             # If Platform API returned an error
             if self._error_message:
+                if "Login is required" in self._error_message or "expired" in self._error_message.lower():
+                    clear_platform_session(preferences, status="Session expired. Log in again.")
                 self.report({'ERROR'}, self._error_message)
                 return {'CANCELLED'}
 
@@ -284,10 +378,14 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
 
 def register():
     """Register the operators with Blender."""
+    bpy.utils.register_class(PLANETOPBR_OT_login_platform)
+    bpy.utils.register_class(PLANETOPBR_OT_logout_platform)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_platform)
 
 def unregister():
     """Unregister the operators from Blender."""
-    bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_platform)
+    bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
+    bpy.utils.unregister_class(PLANETOPBR_OT_logout_platform)
+    bpy.utils.unregister_class(PLANETOPBR_OT_login_platform)

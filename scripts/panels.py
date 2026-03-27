@@ -1,5 +1,7 @@
 import bpy
 
+from .properties import get_addon_preferences
+
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """
     UI Panel for the PlaneToPBR add-on.
@@ -17,6 +19,7 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
         """
         layout = self.layout
         scene = context.scene
+        preferences = get_addon_preferences(context)
 
         # ------------------------------------------------------------
         # AI Settings Section
@@ -39,22 +42,6 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
 
         layout.separator()
 
-        # ------------------------------------------------------------
-        # Platform API Credentials Section
-        # ------------------------------------------------------------
-        box = layout.box()
-        box.label(text="Platform API Credentials")
-
-        # Email and password fields for platform authentication
-        box.prop(scene, "planetopbr_email")
-        box.prop(scene, "planetopbr_password")
-
-        layout.separator()
-
-        # ------------------------------------------------------------
-        # Generate Buttons
-        # ------------------------------------------------------------
-
         # HuggingFace button
         layout.operator(
             "object.import_plane_from_image",
@@ -62,10 +49,18 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
             icon='COMMUNITY'
         )
 
-        # Platform API button
-        layout.operator(
+        pro_box = layout.box()
+        pro_box.label(text="Pro")
+        if preferences.planetopbr_logged_in:
+            pro_box.label(text="Logged in", icon='CHECKMARK')
+        else:
+            pro_box.label(text="Log in from Preferences to unlock", icon='LOCKED')
+
+        pro_row = pro_box.row()
+        pro_row.enabled = preferences.planetopbr_logged_in
+        pro_row.operator(
             "object.import_plane_from_platform",
-            text="Generate PBR (Platform)",
+            text="Generate PBR (Pro)",
             icon='WORLD'
         )
 

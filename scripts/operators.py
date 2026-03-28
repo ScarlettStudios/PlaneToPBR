@@ -5,18 +5,24 @@ from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr
 from .platform_client import PlatformClient, PlatformClientError
 
 
+ADDON_KEYS = (
+    "planetopbr",
+    __package__.split(".")[0] if __package__ else __name__.split(".")[0],
+)
+
+
 def _get_addon_preferences(context):
-    addon_key = __package__.split(".")[0] if __package__ else __name__.split(".")[0]
     addons = getattr(getattr(context, "preferences", None), "addons", None)
 
     if addons is None:
         raise RuntimeError("Unable to access Blender add-on preferences.")
 
-    addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
-    if addon_entry is None or getattr(addon_entry, "preferences", None) is None:
-        raise RuntimeError("PlaneToPBR preferences are unavailable.")
+    for addon_key in ADDON_KEYS:
+        addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
+        if addon_entry is not None and getattr(addon_entry, "preferences", None) is not None:
+            return addon_entry.preferences
 
-    return addon_entry.preferences
+    raise RuntimeError("PlaneToPBR preferences are unavailable.")
 
 
 class PLANETOPBR_OT_platform_login(bpy.types.Operator):

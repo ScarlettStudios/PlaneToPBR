@@ -2,7 +2,7 @@ import bpy
 from bpy.props import BoolProperty, StringProperty
 
 
-ADDON_PACKAGE = __package__.split(".")[0] if __package__ else __name__.split(".")[0]
+ADDON_PACKAGE = "planetopbr"
 
 
 class PLANETOPBR_AddonPreferences(bpy.types.AddonPreferences):

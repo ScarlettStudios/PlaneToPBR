@@ -1,18 +1,24 @@
 import bpy
 
 
+ADDON_KEYS = (
+    "planetopbr",
+    __package__.split(".")[0] if __package__ else __name__.split(".")[0],
+)
+
+
 def _get_addon_preferences(context):
-    addon_key = __package__.split(".")[0] if __package__ else __name__.split(".")[0]
     addons = getattr(getattr(context, "preferences", None), "addons", None)
 
     if addons is None:
         return None
 
-    addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
-    if addon_entry is None:
-        return None
+    for addon_key in ADDON_KEYS:
+        addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
+        if addon_entry is not None:
+            return getattr(addon_entry, "preferences", None)
 
-    return getattr(addon_entry, "preferences", None)
+    return None
 
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """

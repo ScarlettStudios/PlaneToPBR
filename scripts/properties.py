@@ -8,39 +8,15 @@ class PLANETOPBR_AddonPreferences(bpy.types.AddonPreferences):
 
     bl_idname = BASE_PACKAGE
 
-    platform_email = StringProperty(
-        name="Email",
-        description="Scarlett Studios account email address",
-        default="",
-    )
-
-    platform_password = StringProperty(
-        name="Password",
-        description="Scarlett Studios account password",
-        default="",
-        subtype='PASSWORD',
-    )
-
     platform_access_token = StringProperty(default="", options={'HIDDEN'})
     platform_refresh_token = StringProperty(default="", options={'HIDDEN'})
     platform_account_email = StringProperty(default="", options={'HIDDEN'})
     platform_logged_in = BoolProperty(default=False, options={'HIDDEN'})
+    platform_login_in_progress = BoolProperty(default=False, options={'HIDDEN'})
+    platform_browser_session_id = StringProperty(default="", options={'HIDDEN'})
 
     def draw(self, context):
-        layout = self.layout
-        box = layout.box()
-        box.label(text="PlaneToPBR Pro Login")
-
-        if self.platform_logged_in and self.platform_access_token:
-            account_email = self.platform_account_email or self.platform_email
-            box.label(text=f"Signed in as {account_email}")
-            box.operator("planetopbr.platform_logout", text="Log Out", icon='X')
-        else:
-            box.prop(self, "platform_email")
-            box.prop(self, "platform_password")
-            box.operator("planetopbr.platform_login", text="Log In", icon='CHECKMARK')
-
-        layout.label(text="Hugging Face generation remains free.", icon='INFO')
+        pass
 
 # ------------------------------------------------------------
 # Scene Property Registration

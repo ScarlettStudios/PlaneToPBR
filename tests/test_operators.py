@@ -16,8 +16,11 @@ if REPO_ROOT not in sys.path:
 
 mock_bpy = types.ModuleType("bpy")
 mock_bpy.types = types.SimpleNamespace(Operator=object)
+mock_bpy.props = types.SimpleNamespace(StringProperty=lambda **kwargs: None)
 mock_bpy.utils = types.SimpleNamespace(register_class=lambda x: None,
                                        unregister_class=lambda x: None)
+mock_bpy.context = types.SimpleNamespace(window_manager=types.SimpleNamespace(windows=[]))
+mock_bpy.ops = types.SimpleNamespace(wm=types.SimpleNamespace(url_open=lambda **kwargs: None))
 
 sys.modules["bpy"] = mock_bpy
 
@@ -25,6 +28,7 @@ from scripts.operators import (
     OBJECT_OT_import_plane_from_image,
     OBJECT_OT_import_plane_from_platform,
     PLANETOPBR_OT_platform_login,
+    PLANETOPBR_OT_platform_cancel_login,
     PLANETOPBR_OT_platform_logout,
 )
 
@@ -49,12 +53,12 @@ class TestOperators(unittest.TestCase):
 
     def _add_preferences(self, context, **overrides):
         prefs = types.SimpleNamespace(
-            platform_email="user@example.com",
-            platform_password="secret",
             platform_access_token="access_123",
             platform_refresh_token="refresh_456",
             platform_account_email="user@example.com",
             platform_logged_in=True,
+            platform_login_in_progress=False,
+            platform_browser_session_id="",
         )
 
         for key, value in overrides.items():
@@ -284,22 +288,22 @@ class TestOperators(unittest.TestCase):
         )
 
         client = mock_client_cls.return_value
-        client.access_token = "new_access"
-        client.refresh_token = "new_refresh"
-        client.get_me.return_value = {"email": "artist@example.com"}
+        client.start_browser_login.return_value = {
+            "session_id": "session_123",
+            "authorize_url": "https://example.com/login",
+        }
 
         op = PLANETOPBR_OT_platform_login()
+        op.mode = "login"
         op.report = MagicMock()
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'FINISHED'})
-        client.login.assert_called_once_with(email="user@example.com", password="secret")
-        self.assertEqual(prefs.platform_access_token, "new_access")
-        self.assertEqual(prefs.platform_refresh_token, "new_refresh")
-        self.assertEqual(prefs.platform_account_email, "artist@example.com")
-        self.assertEqual(prefs.platform_password, "")
-        self.assertTrue(prefs.platform_logged_in)
+        self.assertEqual(result, {'RUNNING_MODAL'})
+        client.start_browser_login.assert_called_once_with(mode="login")
+        self.assertEqual(prefs.platform_browser_session_id, "session_123")
+        self.assertTrue(prefs.platform_login_in_progress)
+        context.window_manager.modal_handler_add.assert_called_once()
 
     def test_platform_logout_operator_clears_login_state(self):
         context = self._mock_context()
@@ -314,8 +318,27 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(prefs.platform_access_token, "")
         self.assertEqual(prefs.platform_refresh_token, "")
         self.assertEqual(prefs.platform_account_email, "")
-        self.assertEqual(prefs.platform_password, "")
+        self.assertEqual(prefs.platform_browser_session_id, "")
         self.assertFalse(prefs.platform_logged_in)
+
+    @patch("scripts.operators.PlatformClient")
+    def test_platform_cancel_login_clears_browser_state(self, mock_client_cls):
+        context = self._mock_context()
+        prefs = self._add_preferences(
+            context,
+            platform_login_in_progress=True,
+            platform_browser_session_id="session_123",
+        )
+
+        op = PLANETOPBR_OT_platform_cancel_login()
+        op.report = MagicMock()
+
+        result = op.execute(context)
+
+        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(prefs.platform_browser_session_id, "")
+        self.assertFalse(prefs.platform_login_in_progress)
+        mock_client_cls.return_value.cancel_browser_login.assert_called_once_with("session_123")
 
     def test_platform_execute_requires_login(self):
         context = self._mock_context()
@@ -384,6 +407,45 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(prefs.platform_access_token, "new_access")
         self.assertEqual(prefs.platform_refresh_token, "new_refresh")
         self.assertTrue(prefs.platform_logged_in)
+
+    @patch("scripts.operators.PlatformClient")
+    def test_platform_login_modal_approved(self, mock_client_cls):
+        context = self._mock_context()
+        prefs = self._add_preferences(
+            context,
+            platform_access_token="",
+            platform_refresh_token="",
+            platform_logged_in=False,
+            platform_login_in_progress=True,
+            platform_browser_session_id="session_123",
+            platform_account_email="",
+        )
+
+        client = mock_client_cls.return_value
+        client.get_browser_login_status.return_value = {
+            "status": "approved",
+            "access_token": "new_access",
+            "refresh_token": "new_refresh",
+        }
+        client.get_me.return_value = {"email": "artist@example.com"}
+
+        op = PLANETOPBR_OT_platform_login()
+        op.mode = "login"
+        op._client = client
+        op._timer = "timer"
+        op.report = MagicMock()
+
+        event = MagicMock()
+        event.type = "TIMER"
+
+        result = op.modal(context, event)
+
+        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(prefs.platform_access_token, "new_access")
+        self.assertEqual(prefs.platform_refresh_token, "new_refresh")
+        self.assertEqual(prefs.platform_account_email, "artist@example.com")
+        self.assertEqual(prefs.platform_browser_session_id, "")
+        self.assertFalse(prefs.platform_login_in_progress)
 
 
 if __name__ == "__main__":

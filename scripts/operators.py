@@ -6,45 +6,178 @@ from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr
 from .platform_client import PlatformClient, PlatformClientError
 
 
+def _redraw_preferences():
+    for window in bpy.context.window_manager.windows:
+        screen = window.screen
+        if screen is None:
+            continue
+        for area in screen.areas:
+            if area.type != "PREFERENCES":
+                continue
+            for region in area.regions:
+                if region.type in {"WINDOW", "UI"}:
+                    region.tag_redraw()
+
+
 class PLANETOPBR_OT_platform_login(bpy.types.Operator):
-    """Authenticate the Scarlett Studios platform account from add-on preferences."""
+    """Authenticate the Scarlett Studios platform account through the browser."""
 
     bl_idname = "planetopbr.platform_login"
     bl_label = "PlaneToPBR Platform Login"
+
+    mode: bpy.props.StringProperty(default="login", options={'HIDDEN'})
+
+    _timer = None
+    _client = None
 
     def execute(self, context):
         try:
             prefs = get_addon_preferences(context)
             if prefs is None:
                 raise RuntimeError("PlaneToPBR preferences are unavailable.")
-            email = getattr(prefs, "platform_email", "").strip()
-            password = getattr(prefs, "platform_password", "")
 
-            if not email or not password:
-                self.report({'ERROR'}, "Enter your email and password in Add-on Preferences.")
+            if prefs.platform_login_in_progress:
+                self.report({'ERROR'}, "PlaneToPBR Pro login is already in progress.")
                 return {'CANCELLED'}
 
-            client = PlatformClient()
-            client.login(email=email, password=password)
+            self._client = PlatformClient()
+            session = self._client.start_browser_login(mode=self.mode or "login")
+            authorize_url = session.get("authorize_url")
+            session_id = session.get("session_id")
 
-            try:
-                account = client.get_me()
-                account_email = account.get("email") or email
-            except PlatformClientError:
-                account_email = email
+            if not authorize_url or not session_id:
+                raise RuntimeError("Browser login session could not be started.")
 
-            prefs.platform_email = account_email
-            prefs.platform_account_email = account_email
-            prefs.platform_access_token = client.access_token or ""
-            prefs.platform_refresh_token = client.refresh_token or ""
-            prefs.platform_logged_in = True
-            prefs.platform_password = ""
+            prefs.platform_browser_session_id = session_id
+            prefs.platform_login_in_progress = True
+            _redraw_preferences()
 
-            self.report({'INFO'}, f"Signed in as {account_email}")
-            return {'FINISHED'}
+            bpy.ops.wm.url_open(url=authorize_url)
+
+            wm = context.window_manager
+            self._timer = wm.event_timer_add(1.0, window=context.window)
+            wm.modal_handler_add(self)
+            return {'RUNNING_MODAL'}
         except Exception as e:
+            if prefs is not None:
+                prefs.platform_browser_session_id = ""
+                prefs.platform_login_in_progress = False
+                _redraw_preferences()
             self.report({'ERROR'}, str(e))
             return {'CANCELLED'}
+
+    def modal(self, context, event):
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+
+        prefs = get_addon_preferences(context)
+        if prefs is None:
+            self._finish(context)
+            self.report({'ERROR'}, "PlaneToPBR preferences are unavailable.")
+            return {'CANCELLED'}
+
+        session_id = prefs.platform_browser_session_id
+        if not session_id:
+            self._finish(context)
+            return {'CANCELLED'}
+
+        try:
+            status = self._client.get_browser_login_status(session_id)
+        except Exception as exc:
+            prefs.platform_login_in_progress = False
+            prefs.platform_browser_session_id = ""
+            _redraw_preferences()
+            self._finish(context)
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+        state = status.get("status")
+        if state == "approved":
+            prefs.platform_access_token = status.get("access_token", "")
+            prefs.platform_refresh_token = status.get("refresh_token", "")
+            prefs.platform_browser_session_id = ""
+            prefs.platform_login_in_progress = False
+            prefs.platform_logged_in = bool(prefs.platform_access_token)
+
+            if prefs.platform_logged_in:
+                try:
+                    self._client.access_token = prefs.platform_access_token
+                    self._client.refresh_token = prefs.platform_refresh_token
+                    account = self._client.get_me()
+                    prefs.platform_account_email = account.get("email", "")
+                except PlatformClientError:
+                    pass
+
+            _redraw_preferences()
+            self._finish(context)
+            self.report({'INFO'}, "PlaneToPBR Pro login complete.")
+            return {'FINISHED'}
+
+        if state == "cancelled":
+            prefs.platform_browser_session_id = ""
+            prefs.platform_login_in_progress = False
+            _redraw_preferences()
+            self._finish(context)
+            self.report({'WARNING'}, "PlaneToPBR Pro login was cancelled.")
+            return {'CANCELLED'}
+
+        return {'PASS_THROUGH'}
+
+    def cancel(self, context):
+        prefs = get_addon_preferences(context)
+        if prefs is not None:
+            session_id = prefs.platform_browser_session_id
+            prefs.platform_browser_session_id = ""
+            prefs.platform_login_in_progress = False
+            _redraw_preferences()
+            if session_id and self._client is not None:
+                try:
+                    self._client.cancel_browser_login(session_id)
+                except Exception:
+                    pass
+        self._finish(context)
+
+    def _finish(self, context):
+        if self._timer is not None:
+            context.window_manager.event_timer_remove(self._timer)
+            self._timer = None
+
+
+class PLANETOPBR_OT_platform_signup(bpy.types.Operator):
+    """Start a browser sign-up flow for PlaneToPBR Pro."""
+
+    bl_idname = "planetopbr.platform_signup"
+    bl_label = "PlaneToPBR Platform Sign Up"
+
+    def execute(self, context):
+        return bpy.ops.planetopbr.platform_login(mode="register")
+
+
+class PLANETOPBR_OT_platform_cancel_login(bpy.types.Operator):
+    """Cancel an in-progress browser login."""
+
+    bl_idname = "planetopbr.platform_cancel_login"
+    bl_label = "PlaneToPBR Platform Cancel Login"
+
+    def execute(self, context):
+        prefs = get_addon_preferences(context)
+        if prefs is None:
+            self.report({'ERROR'}, "PlaneToPBR preferences are unavailable.")
+            return {'CANCELLED'}
+
+        session_id = prefs.platform_browser_session_id
+        prefs.platform_browser_session_id = ""
+        prefs.platform_login_in_progress = False
+        _redraw_preferences()
+
+        if session_id:
+            try:
+                PlatformClient().cancel_browser_login(session_id)
+            except Exception:
+                pass
+
+        self.report({'INFO'}, "PlaneToPBR Pro login cancelled.")
+        return {'FINISHED'}
 
 
 class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
@@ -61,8 +194,10 @@ class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
             prefs.platform_access_token = ""
             prefs.platform_refresh_token = ""
             prefs.platform_account_email = ""
-            prefs.platform_password = ""
+            prefs.platform_browser_session_id = ""
+            prefs.platform_login_in_progress = False
             prefs.platform_logged_in = False
+            _redraw_preferences()
             self.report({'INFO'}, "Logged out of PlaneToPBR Pro.")
             return {'FINISHED'}
         except Exception as e:
@@ -273,7 +408,7 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             refresh_token = getattr(prefs, "platform_refresh_token", "")
 
             if not access_token:
-                self.report({'ERROR'}, "PlaneToPBR Pro login required in Add-on Preferences.")
+                self.report({'ERROR'}, "PlaneToPBR Pro login required in Preferences > Get Extensions.")
                 return {'CANCELLED'}
 
             # Reset runtime state
@@ -362,6 +497,8 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
 def register():
     """Register the operators with Blender."""
     bpy.utils.register_class(PLANETOPBR_OT_platform_login)
+    bpy.utils.register_class(PLANETOPBR_OT_platform_signup)
+    bpy.utils.register_class(PLANETOPBR_OT_platform_cancel_login)
     bpy.utils.register_class(PLANETOPBR_OT_platform_logout)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_platform)
@@ -371,4 +508,6 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_platform)
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.unregister_class(PLANETOPBR_OT_platform_logout)
+    bpy.utils.unregister_class(PLANETOPBR_OT_platform_cancel_login)
+    bpy.utils.unregister_class(PLANETOPBR_OT_platform_signup)
     bpy.utils.unregister_class(PLANETOPBR_OT_platform_login)

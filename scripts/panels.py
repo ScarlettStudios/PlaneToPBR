@@ -54,10 +54,19 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
         # Platform API button
         prefs = get_addon_preferences(context)
         pro_row = layout.row()
-        pro_row.enabled = bool(prefs and prefs.platform_logged_in and prefs.platform_access_token)
+        pro_available = bool(
+            prefs and prefs.platform_logged_in and prefs.platform_access_token and not prefs.platform_login_in_progress
+        )
+        pro_row.enabled = pro_available
         pro_row.operator(
             "object.import_plane_from_platform",
-            text="Generate PBR Pro (GPU)" if pro_row.enabled else "Generate PBR Pro (Login in Preferences)",
+            text=(
+                "Generate PBR Pro (GPU)"
+                if pro_available else
+                "Generate PBR Pro (Browser Login In Progress)"
+                if prefs and prefs.platform_login_in_progress else
+                "Generate PBR Pro (Login in Preferences)"
+            ),
             icon='WORLD'
         )
 

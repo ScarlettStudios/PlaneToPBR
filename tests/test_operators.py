@@ -56,6 +56,8 @@ class TestOperators(unittest.TestCase):
             platform_access_token="access_123",
             platform_refresh_token="refresh_456",
             platform_account_email="user@example.com",
+            platform_plan_label="Free plan",
+            platform_balance_tokens=0,
             platform_logged_in=True,
             platform_login_in_progress=False,
             platform_browser_session_id="",
@@ -318,6 +320,8 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(prefs.platform_access_token, "")
         self.assertEqual(prefs.platform_refresh_token, "")
         self.assertEqual(prefs.platform_account_email, "")
+        self.assertEqual(prefs.platform_plan_label, "Free plan")
+        self.assertEqual(prefs.platform_balance_tokens, 0)
         self.assertEqual(prefs.platform_browser_session_id, "")
         self.assertFalse(prefs.platform_logged_in)
 
@@ -428,6 +432,7 @@ class TestOperators(unittest.TestCase):
             "refresh_token": "new_refresh",
         }
         client.get_me.return_value = {"email": "artist@example.com"}
+        client.get_balance.return_value = {"balance_tokens": 42}
 
         op = PLANETOPBR_OT_platform_login()
         op.mode = "login"
@@ -444,6 +449,8 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(prefs.platform_access_token, "new_access")
         self.assertEqual(prefs.platform_refresh_token, "new_refresh")
         self.assertEqual(prefs.platform_account_email, "artist@example.com")
+        self.assertEqual(prefs.platform_plan_label, "Free plan")
+        self.assertEqual(prefs.platform_balance_tokens, 42)
         self.assertEqual(prefs.platform_browser_session_id, "")
         self.assertFalse(prefs.platform_login_in_progress)
 

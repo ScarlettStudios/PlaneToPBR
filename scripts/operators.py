@@ -19,6 +19,18 @@ def _redraw_preferences():
                     region.tag_redraw()
 
 
+def _sync_platform_account_state(prefs, client):
+    account = client.get_me()
+    prefs.platform_account_email = account.get("email", "")
+    prefs.platform_plan_label = "Free plan"
+
+    try:
+        balance = client.get_balance()
+        prefs.platform_balance_tokens = int(balance.get("balance_tokens", 0))
+    except PlatformClientError:
+        prefs.platform_balance_tokens = 0
+
+
 class PLANETOPBR_OT_platform_login(bpy.types.Operator):
     """Authenticate the Scarlett Studios platform account through the browser."""
 
@@ -103,8 +115,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
                 try:
                     self._client.access_token = prefs.platform_access_token
                     self._client.refresh_token = prefs.platform_refresh_token
-                    account = self._client.get_me()
-                    prefs.platform_account_email = account.get("email", "")
+                    _sync_platform_account_state(prefs, self._client)
                 except PlatformClientError:
                     pass
 
@@ -194,6 +205,8 @@ class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
             prefs.platform_access_token = ""
             prefs.platform_refresh_token = ""
             prefs.platform_account_email = ""
+            prefs.platform_plan_label = "Free plan"
+            prefs.platform_balance_tokens = 0
             prefs.platform_browser_session_id = ""
             prefs.platform_login_in_progress = False
             prefs.platform_logged_in = False
@@ -472,6 +485,14 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 prefs.platform_access_token = self._updated_auth_state.get("access_token", "")
                 prefs.platform_refresh_token = self._updated_auth_state.get("refresh_token", "")
                 prefs.platform_logged_in = bool(prefs.platform_access_token)
+                if prefs.platform_logged_in:
+                    client = PlatformClient()
+                    client.access_token = prefs.platform_access_token
+                    client.refresh_token = prefs.platform_refresh_token
+                    try:
+                        _sync_platform_account_state(prefs, client)
+                    except PlatformClientError:
+                        pass
 
             # Attempt to import generated textures
             try:

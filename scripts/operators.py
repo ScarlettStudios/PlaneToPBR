@@ -1,5 +1,6 @@
 import bpy
 import threading
+import webbrowser
 
 from .addon_runtime import get_addon_preferences
 from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr, call_platform_pbr
@@ -29,6 +30,21 @@ def _sync_platform_account_state(prefs, client):
         prefs.platform_balance_tokens = int(balance.get("balance_tokens", 0))
     except PlatformClientError:
         prefs.platform_balance_tokens = 0
+
+
+def _open_browser_url(url):
+    opened = False
+    try:
+        result = bpy.ops.wm.url_open(url=url)
+        opened = 'FINISHED' in result
+    except Exception:
+        opened = False
+
+    if not opened:
+        opened = bool(webbrowser.open(url, new=2))
+
+    if not opened:
+        raise RuntimeError(f"Unable to open browser automatically. Open this URL manually: {url}")
 
 
 class PLANETOPBR_OT_platform_login(bpy.types.Operator):
@@ -61,10 +77,11 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
                 raise RuntimeError("Browser login session could not be started.")
 
             prefs.platform_browser_session_id = session_id
+            prefs.platform_browser_authorize_url = authorize_url
             prefs.platform_login_in_progress = True
             _redraw_preferences()
 
-            bpy.ops.wm.url_open(url=authorize_url)
+            _open_browser_url(authorize_url)
 
             wm = context.window_manager
             self._timer = wm.event_timer_add(1.0, window=context.window)
@@ -73,6 +90,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
         except Exception as e:
             if prefs is not None:
                 prefs.platform_browser_session_id = ""
+                prefs.platform_browser_authorize_url = ""
                 prefs.platform_login_in_progress = False
                 _redraw_preferences()
             self.report({'ERROR'}, str(e))
@@ -98,6 +116,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
         except Exception as exc:
             prefs.platform_login_in_progress = False
             prefs.platform_browser_session_id = ""
+            prefs.platform_browser_authorize_url = ""
             _redraw_preferences()
             self._finish(context)
             self.report({'ERROR'}, str(exc))
@@ -108,6 +127,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
             prefs.platform_access_token = status.get("access_token", "")
             prefs.platform_refresh_token = status.get("refresh_token", "")
             prefs.platform_browser_session_id = ""
+            prefs.platform_browser_authorize_url = ""
             prefs.platform_login_in_progress = False
             prefs.platform_logged_in = bool(prefs.platform_access_token)
 
@@ -126,6 +146,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
 
         if state == "cancelled":
             prefs.platform_browser_session_id = ""
+            prefs.platform_browser_authorize_url = ""
             prefs.platform_login_in_progress = False
             _redraw_preferences()
             self._finish(context)
@@ -139,6 +160,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
         if prefs is not None:
             session_id = prefs.platform_browser_session_id
             prefs.platform_browser_session_id = ""
+            prefs.platform_browser_authorize_url = ""
             prefs.platform_login_in_progress = False
             _redraw_preferences()
             if session_id and self._client is not None:
@@ -178,6 +200,7 @@ class PLANETOPBR_OT_platform_cancel_login(bpy.types.Operator):
 
         session_id = prefs.platform_browser_session_id
         prefs.platform_browser_session_id = ""
+        prefs.platform_browser_authorize_url = ""
         prefs.platform_login_in_progress = False
         _redraw_preferences()
 
@@ -188,6 +211,28 @@ class PLANETOPBR_OT_platform_cancel_login(bpy.types.Operator):
                 pass
 
         self.report({'INFO'}, "PlaneToPBR Pro login cancelled.")
+        return {'FINISHED'}
+
+
+class PLANETOPBR_OT_platform_open_browser(bpy.types.Operator):
+    """Open the active browser auth URL again."""
+
+    bl_idname = "planetopbr.platform_open_browser"
+    bl_label = "PlaneToPBR Platform Open Browser"
+
+    def execute(self, context):
+        prefs = get_addon_preferences(context)
+        if prefs is None or not prefs.platform_browser_authorize_url:
+            self.report({'ERROR'}, "No browser login URL is available.")
+            return {'CANCELLED'}
+
+        try:
+            _open_browser_url(prefs.platform_browser_authorize_url)
+        except Exception as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+
+        self.report({'INFO'}, "Opened browser login page.")
         return {'FINISHED'}
 
 
@@ -208,6 +253,7 @@ class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
             prefs.platform_plan_label = "Free plan"
             prefs.platform_balance_tokens = 0
             prefs.platform_browser_session_id = ""
+            prefs.platform_browser_authorize_url = ""
             prefs.platform_login_in_progress = False
             prefs.platform_logged_in = False
             _redraw_preferences()
@@ -520,6 +566,7 @@ def register():
     bpy.utils.register_class(PLANETOPBR_OT_platform_login)
     bpy.utils.register_class(PLANETOPBR_OT_platform_signup)
     bpy.utils.register_class(PLANETOPBR_OT_platform_cancel_login)
+    bpy.utils.register_class(PLANETOPBR_OT_platform_open_browser)
     bpy.utils.register_class(PLANETOPBR_OT_platform_logout)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_platform)
@@ -529,6 +576,7 @@ def unregister():
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_platform)
     bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.unregister_class(PLANETOPBR_OT_platform_logout)
+    bpy.utils.unregister_class(PLANETOPBR_OT_platform_open_browser)
     bpy.utils.unregister_class(PLANETOPBR_OT_platform_cancel_login)
     bpy.utils.unregister_class(PLANETOPBR_OT_platform_signup)
     bpy.utils.unregister_class(PLANETOPBR_OT_platform_login)

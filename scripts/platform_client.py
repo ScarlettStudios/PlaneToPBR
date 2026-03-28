@@ -8,7 +8,7 @@ from typing import Dict, Optional
 
 
 DEFAULT_TIMEOUT = 60
-DEFAULT_BASE_URL = os.getenv("PLANETOPBR_API_BASE_URL", "https://api.scarlettstudios.com/v1")
+DEFAULT_BASE_URL = os.getenv("PLANETOPBR_API_BASE_URL", "http://127.0.0.1:8001")
 
 
 class PlatformClientError(RuntimeError):
@@ -101,7 +101,7 @@ class PlatformClient:
 
     def get_balance(self) -> Dict:
         """Fetch authenticated user's token balance."""
-        return self._request_json("GET", "/billing/balance", auth_required=True)
+        return self._request_json("GET", "/wallet", auth_required=True)
 
     def create_pbr_job(
         self,

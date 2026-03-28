@@ -1,28 +1,9 @@
 import bpy
 import threading
 
+from .addon_runtime import get_addon_preferences
 from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr, call_platform_pbr
 from .platform_client import PlatformClient, PlatformClientError
-
-
-ADDON_KEYS = (
-    "planetopbr",
-    __package__.split(".")[0] if __package__ else __name__.split(".")[0],
-)
-
-
-def _get_addon_preferences(context):
-    addons = getattr(getattr(context, "preferences", None), "addons", None)
-
-    if addons is None:
-        raise RuntimeError("Unable to access Blender add-on preferences.")
-
-    for addon_key in ADDON_KEYS:
-        addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
-        if addon_entry is not None and getattr(addon_entry, "preferences", None) is not None:
-            return addon_entry.preferences
-
-    raise RuntimeError("PlaneToPBR preferences are unavailable.")
 
 
 class PLANETOPBR_OT_platform_login(bpy.types.Operator):
@@ -33,7 +14,9 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
 
     def execute(self, context):
         try:
-            prefs = _get_addon_preferences(context)
+            prefs = get_addon_preferences(context)
+            if prefs is None:
+                raise RuntimeError("PlaneToPBR preferences are unavailable.")
             email = getattr(prefs, "platform_email", "").strip()
             password = getattr(prefs, "platform_password", "")
 
@@ -72,7 +55,9 @@ class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
 
     def execute(self, context):
         try:
-            prefs = _get_addon_preferences(context)
+            prefs = get_addon_preferences(context)
+            if prefs is None:
+                raise RuntimeError("PlaneToPBR preferences are unavailable.")
             prefs.platform_access_token = ""
             prefs.platform_refresh_token = ""
             prefs.platform_account_email = ""
@@ -281,7 +266,9 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 self.report({'ERROR'}, "No image selected")
                 return {'CANCELLED'}
 
-            prefs = _get_addon_preferences(context)
+            prefs = get_addon_preferences(context)
+            if prefs is None:
+                raise RuntimeError("PlaneToPBR preferences are unavailable.")
             access_token = getattr(prefs, "platform_access_token", "")
             refresh_token = getattr(prefs, "platform_refresh_token", "")
 
@@ -344,7 +331,9 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
                 return {'CANCELLED'}
 
             if self._updated_auth_state:
-                prefs = _get_addon_preferences(context)
+                prefs = get_addon_preferences(context)
+                if prefs is None:
+                    raise RuntimeError("PlaneToPBR preferences are unavailable.")
                 prefs.platform_access_token = self._updated_auth_state.get("access_token", "")
                 prefs.platform_refresh_token = self._updated_auth_state.get("refresh_token", "")
                 prefs.platform_logged_in = bool(prefs.platform_access_token)

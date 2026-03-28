@@ -1,24 +1,5 @@
 import bpy
-
-
-ADDON_KEYS = (
-    "planetopbr",
-    __package__.split(".")[0] if __package__ else __name__.split(".")[0],
-)
-
-
-def _get_addon_preferences(context):
-    addons = getattr(getattr(context, "preferences", None), "addons", None)
-
-    if addons is None:
-        return None
-
-    for addon_key in ADDON_KEYS:
-        addon_entry = addons.get(addon_key) if hasattr(addons, "get") else None
-        if addon_entry is not None:
-            return getattr(addon_entry, "preferences", None)
-
-    return None
+from .addon_runtime import get_addon_preferences
 
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """
@@ -77,7 +58,7 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
             icon='WORLD'
         )
 
-        prefs = _get_addon_preferences(context)
+        prefs = get_addon_preferences(context)
         if prefs and prefs.platform_logged_in and prefs.platform_access_token:
             layout.label(
                 text=f"PBR Pro signed in as {prefs.platform_account_email or prefs.platform_email}",

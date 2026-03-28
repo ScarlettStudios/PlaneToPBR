@@ -1,14 +1,12 @@
 import bpy
 from bpy.props import BoolProperty, StringProperty
-
-
-ADDON_PACKAGE = "planetopbr"
+from .addon_runtime import BASE_PACKAGE
 
 
 class PLANETOPBR_AddonPreferences(bpy.types.AddonPreferences):
     """Persistent add-on settings, including platform login state."""
 
-    bl_idname = ADDON_PACKAGE
+    bl_idname = BASE_PACKAGE
 
     platform_email = StringProperty(
         name="Email",

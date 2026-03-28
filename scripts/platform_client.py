@@ -61,6 +61,21 @@ class PlatformClient:
         self.refresh_token = response.get("refresh_token")
         return response
 
+    def start_browser_login(self, mode: str = "login") -> Dict:
+        response = self._request_json("POST", "/auth/browser/start", auth_required=False)
+        authorize_url = response.get("authorize_url")
+        if authorize_url and not authorize_url.startswith("http"):
+            separator = "&" if "?" in authorize_url else "?"
+            authorize_url = f"{self._public_base_url()}{authorize_url}{separator}mode={mode}"
+            response["authorize_url"] = authorize_url
+        return response
+
+    def get_browser_login_status(self, session_id: str) -> Dict:
+        return self._request_json("GET", f"/auth/browser/status/{session_id}", auth_required=False)
+
+    def cancel_browser_login(self, session_id: str) -> Dict:
+        return self._request_json("POST", f"/auth/browser/cancel/{session_id}", auth_required=False)
+
     def get_me(self) -> Dict:
         return self._request_json("GET", "/auth/me", auth_required=True)
 
@@ -81,6 +96,7 @@ class PlatformClient:
             raise PlatformAuthError("Refresh response missing access_token.")
 
         self.access_token = access_token
+        self.refresh_token = response.get("refresh_token", self.refresh_token)
         return response
 
     def get_balance(self) -> Dict:
@@ -211,6 +227,11 @@ class PlatformClient:
             raise PlatformClientError("Backend API request timed out.")
         except json.JSONDecodeError:
             raise PlatformClientError("Invalid JSON response from backend API.")
+
+    def _public_base_url(self) -> str:
+        if self.base_url.endswith("/v1"):
+            return self.base_url[:-3]
+        return self.base_url
 
 
 def _parse_error_response(http_error: urllib.error.HTTPError) -> Dict[str, Optional[str]]:

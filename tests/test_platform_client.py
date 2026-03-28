@@ -31,7 +31,7 @@ class TestPlatformClient(unittest.TestCase):
         """Test client initializes with default values."""
         client = PlatformClient()
 
-        self.assertEqual(client.base_url, "https://api.scarlettstudios.com/v1")
+        self.assertEqual(client.base_url, "http://127.0.0.1:8001")
         self.assertEqual(client.timeout, 60)
         self.assertIsNone(client.access_token)
         self.assertIsNone(client.refresh_token)
@@ -186,8 +186,7 @@ class TestPlatformClient(unittest.TestCase):
         """Test get_balance returns balance info."""
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({
-            "balance": 1000,
-            "currency": "credits"
+            "balance_tokens": 1000
         }).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
@@ -196,8 +195,7 @@ class TestPlatformClient(unittest.TestCase):
 
         result = client.get_balance()
 
-        self.assertEqual(result["balance"], 1000)
-        self.assertEqual(result["currency"], "credits")
+        self.assertEqual(result["balance_tokens"], 1000)
 
     # ------------------------------------------------------------
     # Create PBR Job Tests

@@ -20,7 +20,7 @@ mock_bpy.props = types.SimpleNamespace(StringProperty=lambda **kwargs: None)
 mock_bpy.utils = types.SimpleNamespace(register_class=lambda x: None,
                                        unregister_class=lambda x: None)
 mock_bpy.context = types.SimpleNamespace(window_manager=types.SimpleNamespace(windows=[]))
-mock_bpy.ops = types.SimpleNamespace(wm=types.SimpleNamespace(url_open=lambda **kwargs: None))
+mock_bpy.ops = types.SimpleNamespace(wm=types.SimpleNamespace(url_open=lambda **kwargs: {'FINISHED'}))
 
 sys.modules["bpy"] = mock_bpy
 
@@ -61,6 +61,7 @@ class TestOperators(unittest.TestCase):
             platform_logged_in=True,
             platform_login_in_progress=False,
             platform_browser_session_id="",
+            platform_browser_authorize_url="",
         )
 
         for key, value in overrides.items():
@@ -304,6 +305,7 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(result, {'RUNNING_MODAL'})
         client.start_browser_login.assert_called_once_with(mode="login")
         self.assertEqual(prefs.platform_browser_session_id, "session_123")
+        self.assertEqual(prefs.platform_browser_authorize_url, "https://example.com/login")
         self.assertTrue(prefs.platform_login_in_progress)
         context.window_manager.modal_handler_add.assert_called_once()
 
@@ -323,6 +325,7 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(prefs.platform_plan_label, "Free plan")
         self.assertEqual(prefs.platform_balance_tokens, 0)
         self.assertEqual(prefs.platform_browser_session_id, "")
+        self.assertEqual(prefs.platform_browser_authorize_url, "")
         self.assertFalse(prefs.platform_logged_in)
 
     @patch("scripts.operators.PlatformClient")
@@ -452,6 +455,7 @@ class TestOperators(unittest.TestCase):
         self.assertEqual(prefs.platform_plan_label, "Free plan")
         self.assertEqual(prefs.platform_balance_tokens, 42)
         self.assertEqual(prefs.platform_browser_session_id, "")
+        self.assertEqual(prefs.platform_browser_authorize_url, "")
         self.assertFalse(prefs.platform_login_in_progress)
 
 

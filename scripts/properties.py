@@ -16,6 +16,7 @@ class PLANETOPBR_AddonPreferences(bpy.types.AddonPreferences):
     platform_logged_in = BoolProperty(default=False, options={'HIDDEN'})
     platform_login_in_progress = BoolProperty(default=False, options={'HIDDEN'})
     platform_browser_session_id = StringProperty(default="", options={'HIDDEN'})
+    platform_browser_authorize_url = StringProperty(default="", options={'HIDDEN'})
 
     def draw(self, context):
         pass

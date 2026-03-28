@@ -23,7 +23,9 @@ def _draw_planetopbr_extension_ui(layout, context):
     if prefs.platform_login_in_progress:
         box.label(text="Login through browser", icon='INFO')
         box.label(text="in progress.")
-        box.operator("planetopbr.platform_cancel_login", text="Cancel", icon='X')
+        actions = box.row(align=True)
+        actions.operator("planetopbr.platform_open_browser", text="Open Browser", icon='URL')
+        actions.operator("planetopbr.platform_cancel_login", text="Cancel", icon='X')
         return
 
     if prefs.platform_logged_in and prefs.platform_access_token:

@@ -39,8 +39,7 @@ jobs:
             blender_manifest.toml \
             README.md \
             LICENSE \
-            scripts \
-            assets
+            scripts
 
       - name: Validate zip structure
         run: |

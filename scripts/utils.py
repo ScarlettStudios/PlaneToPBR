@@ -5,7 +5,7 @@ import urllib.error
 import socket
 from datetime import datetime
 import bpy
-from .platform_client import PlatformClient, PlatformClientError
+from .platform_client import PlatformAuthError, PlatformClient, PlatformClientError
 from .hf_client import (
     _resolve_fn_index,
     _upload_file,
@@ -166,22 +166,23 @@ def call_hf_pbr(image_path, output_dir, prompt=""):
         raise RuntimeError(f"PBR generation failed: {e}")
 
 
-def call_platform_pbr(image_path, output_dir, prompt, email, password):
+def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_token=""):
     """
     Call the ScarlettStudios Platform API to generate PBR textures.
 
-    Handles login, job creation, polling, download, and extraction.
+    Uses an existing authenticated platform session to create the job,
+    then handles polling, download, and extraction.
     Returns a dictionary of texture file paths.
 
     Args:
         image_path: Path to input image
         output_dir: Directory to save extracted textures
         prompt: Text prompt for PBR generation
-        email: Platform API email credential
-        password: Platform API password credential
+        access_token: Platform API access token
+        refresh_token: Platform API refresh token
 
     Returns:
-        dict: Texture paths (base_color, normal, roughness, metallic)
+        tuple[dict, dict]: Texture paths plus updated auth tokens
 
     Raises:
         PlatformClientError: On API failures
@@ -190,8 +191,11 @@ def call_platform_pbr(image_path, output_dir, prompt, email, password):
     # Initialize platform client
     client = PlatformClient()
 
-    # Login
-    client.login(email=email, password=password)
+    client.access_token = access_token or None
+    client.refresh_token = refresh_token or None
+
+    if not client.access_token:
+        raise PlatformAuthError("No access token available. Login is required.")
 
     # Create PBR job
     job_response = client.create_pbr_job(
@@ -228,12 +232,19 @@ def call_platform_pbr(image_path, output_dir, prompt, email, password):
                 zip_ref.extractall(extract_dir)
 
             # Build texture dictionary (adjust based on actual file naming)
-            return {
-                "base_color": os.path.join(extract_dir, "base_color.png"),
+            textures = {
+                "diffuse": os.path.join(extract_dir, "base_color.png"),
                 "normal": os.path.join(extract_dir, "normal.png"),
                 "roughness": os.path.join(extract_dir, "roughness.png"),
                 "metallic": os.path.join(extract_dir, "metallic.png"),
             }
+
+            auth_state = {
+                "access_token": client.access_token or "",
+                "refresh_token": client.refresh_token or "",
+            }
+
+            return textures, auth_state
 
         elif status == "failed":
             error_msg = status_response.get("error", "Job failed without error message")

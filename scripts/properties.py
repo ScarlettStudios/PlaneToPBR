@@ -1,5 +1,25 @@
 import bpy
-from bpy.props import StringProperty
+from bpy.props import BoolProperty, IntProperty, StringProperty
+from .addon_runtime import BASE_PACKAGE
+
+
+class PLANETOPBR_AddonPreferences(bpy.types.AddonPreferences):
+    """Persistent add-on settings, including platform login state."""
+
+    bl_idname = BASE_PACKAGE
+
+    platform_access_token = StringProperty(default="", options={'HIDDEN'})
+    platform_refresh_token = StringProperty(default="", options={'HIDDEN'})
+    platform_account_email = StringProperty(default="", options={'HIDDEN'})
+    platform_plan_label = StringProperty(default="Free plan", options={'HIDDEN'})
+    platform_balance_tokens = IntProperty(default=0, options={'HIDDEN'})
+    platform_logged_in = BoolProperty(default=False, options={'HIDDEN'})
+    platform_login_in_progress = BoolProperty(default=False, options={'HIDDEN'})
+    platform_browser_session_id = StringProperty(default="", options={'HIDDEN'})
+    platform_browser_authorize_url = StringProperty(default="", options={'HIDDEN'})
+
+    def draw(self, context):
+        pass
 
 # ------------------------------------------------------------
 # Scene Property Registration
@@ -26,20 +46,7 @@ def register():
         subtype='FILE_PATH'
     )
 
-    # Platform API email credential
-    bpy.types.Scene.planetopbr_email = StringProperty(
-        name="Email",
-        description="Platform API email address",
-        default="",
-    )
-
-    # Platform API password credential
-    bpy.types.Scene.planetopbr_password = StringProperty(
-        name="Password",
-        description="Platform API password",
-        default="",
-        subtype='PASSWORD'
-    )
+    bpy.utils.register_class(PLANETOPBR_AddonPreferences)
 
 def unregister():
     """
@@ -48,5 +55,4 @@ def unregister():
     """
     del bpy.types.Scene.planetopbr_prompt
     del bpy.types.Scene.planetopbr_image_path
-    del bpy.types.Scene.planetopbr_email
-    del bpy.types.Scene.planetopbr_password
+    bpy.utils.unregister_class(PLANETOPBR_AddonPreferences)

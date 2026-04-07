@@ -31,7 +31,7 @@ class TestPlatformClient(unittest.TestCase):
         """Test client initializes with default values."""
         client = PlatformClient()
 
-        self.assertEqual(client.base_url, "https://api.scarlettstudios.com/v1")
+        self.assertEqual(client.base_url, "http://127.0.0.1:8001")
         self.assertEqual(client.timeout, 60)
         self.assertIsNone(client.access_token)
         self.assertIsNone(client.refresh_token)
@@ -139,7 +139,8 @@ class TestPlatformClient(unittest.TestCase):
         """Test refresh token updates access token."""
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({
-            "access_token": "new_access_789"
+            "access_token": "new_access_789",
+            "refresh_token": "refresh_999",
         }).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
@@ -149,6 +150,7 @@ class TestPlatformClient(unittest.TestCase):
         result = client.refresh_access_token()
 
         self.assertEqual(client.access_token, "new_access_789")
+        self.assertEqual(client.refresh_token, "refresh_999")
         self.assertEqual(result["access_token"], "new_access_789")
 
     def test_refresh_access_token_no_refresh_token(self):
@@ -164,7 +166,7 @@ class TestPlatformClient(unittest.TestCase):
     def test_refresh_access_token_missing_access_token(self, mock_urlopen):
         """Test refresh raises error when response missing access_token."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({}).encode("utf-8")
+        mock_response.read.return_value = json.dumps({"refresh_token": "refresh_999"}).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -184,8 +186,7 @@ class TestPlatformClient(unittest.TestCase):
         """Test get_balance returns balance info."""
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({
-            "balance": 1000,
-            "currency": "credits"
+            "balance_tokens": 1000
         }).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
@@ -194,8 +195,7 @@ class TestPlatformClient(unittest.TestCase):
 
         result = client.get_balance()
 
-        self.assertEqual(result["balance"], 1000)
-        self.assertEqual(result["currency"], "credits")
+        self.assertEqual(result["balance_tokens"], 1000)
 
     # ------------------------------------------------------------
     # Create PBR Job Tests
@@ -364,10 +364,12 @@ class TestPlatformClient(unittest.TestCase):
         # Second call (refresh): success
         refresh_response = MagicMock()
         refresh_response.read.return_value = json.dumps({
-            "access_token": "new_access_789"
+            "access_token": "new_access_789",
+            "refresh_token": "refresh_999",
         }).encode("utf-8")
         refresh_response.decode.return_value = json.dumps({
-            "access_token": "new_access_789"
+            "access_token": "new_access_789",
+            "refresh_token": "refresh_999",
         })
 
         # Third call (retry): success
@@ -401,7 +403,27 @@ class TestPlatformClient(unittest.TestCase):
         result = client.get_me()
 
         self.assertEqual(client.access_token, "new_access_789")
+        self.assertEqual(client.refresh_token, "refresh_999")
         self.assertEqual(result["id"], "user_123")
+
+    @patch("scripts.platform_client.urllib.request.urlopen")
+    def test_start_browser_login_success(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "session_id": "session_123",
+            "authorize_url": "/login?bridge_session=session_123",
+            "expires_in_seconds": 600,
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        client = PlatformClient(base_url="https://api.example.com/v1")
+        result = client.start_browser_login(mode="register")
+
+        self.assertEqual(result["session_id"], "session_123")
+        self.assertEqual(
+            result["authorize_url"],
+            "https://api.example.com/login?bridge_session=session_123&mode=register",
+        )
 
     # ------------------------------------------------------------
     # Error Response Parsing Tests

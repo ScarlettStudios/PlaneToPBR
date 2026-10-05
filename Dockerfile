@@ -1,21 +1,26 @@
-FROM python:3.11-slim
+FROM docker.io/library/python:3.11-slim AS base
 
-# Prevent Python from writing pyc files
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
-# Set working directory
 WORKDIR /app
 
-# Install system deps (optional but useful)
-RUN apt-get update && apt-get install -y \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+FROM base AS dependencies
 
-COPY requirements.txt .
+COPY requirements.txt requirements-lint.txt ./
+RUN python -m venv /opt/venv && \
+    /opt/venv/bin/python -m pip install -r requirements.txt -r requirements-lint.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+FROM base AS build
 
-COPY . .
+COPY --from=dependencies /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 
-CMD ["pytest", "-v"]
+COPY __init__.py pytest.ini ruff.toml ./
+COPY scripts/ ./scripts/
+COPY tests/ ./tests/
+
+FROM build AS test
+
+CMD ["python", "-m", "pytest", "-v"]

@@ -1,10 +1,13 @@
 import base64
+import http.client
 import json
 import os
 import socket
 import urllib.error
 import urllib.request
-from typing import Dict, Optional
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+import zipfile
+from typing import Dict, List, Optional
 
 
 DEFAULT_TIMEOUT = 60
@@ -64,10 +67,14 @@ class PlatformClient:
     def start_browser_login(self, mode: str = "login") -> Dict:
         response = self._request_json("POST", "/auth/browser/start", auth_required=False)
         authorize_url = response.get("authorize_url")
-        if authorize_url and not authorize_url.startswith("http"):
-            separator = "&" if "?" in authorize_url else "?"
-            authorize_url = f"{self._public_base_url()}{authorize_url}{separator}mode={mode}"
-            response["authorize_url"] = authorize_url
+        if authorize_url:
+            if not isinstance(authorize_url, str):
+                raise PlatformClientError("Browser login response has an invalid authorize_url.")
+            parts = urlsplit(urljoin(self._public_base_url() + "/", authorize_url))
+            query = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True)
+                     if key != "mode"]
+            query.append(("mode", mode))
+            response["authorize_url"] = urlunsplit(parts._replace(query=urlencode(query)))
         return response
 
     def get_browser_login_status(self, session_id: str) -> Dict:
@@ -122,8 +129,11 @@ class PlatformClient:
         filename = os.path.basename(image_path)
         mime_type = _guess_mime_type(filename)
 
-        with open(image_path, "rb") as infile:
-            raw = infile.read()
+        try:
+            with open(image_path, "rb") as infile:
+                raw = infile.read()
+        except OSError as exc:
+            raise PlatformClientError(f"Unable to read input image {image_path}: {exc}") from exc
 
         payload = {
             "input_image": {
@@ -149,12 +159,13 @@ class PlatformClient:
 
     def download_results(self, download_url: str, output_zip_path: str) -> str:
         """
-        Download job result zip from signed URL (or backend download endpoint).
+        Download job result zip from a public or signed URL without authentication.
 
         Returns the saved zip path.
         """
         try:
-            req = urllib.request.Request(download_url, method="GET")
+            url = urljoin(self.base_url + "/", download_url)
+            req = urllib.request.Request(url, method="GET")
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 data = resp.read()
         except urllib.error.HTTPError as e:
@@ -163,12 +174,40 @@ class PlatformClient:
             raise PlatformClientError(f"Network error downloading results: {e.reason}")
         except socket.timeout:
             raise PlatformClientError("Result download timed out.")
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            raise PlatformClientError(f"Failed to read result download: {exc}") from exc
 
-        os.makedirs(os.path.dirname(output_zip_path) or ".", exist_ok=True)
-        with open(output_zip_path, "wb") as outfile:
-            outfile.write(data)
+        try:
+            os.makedirs(os.path.dirname(output_zip_path) or ".", exist_ok=True)
+            with open(output_zip_path, "wb") as outfile:
+                outfile.write(data)
+        except OSError as exc:
+            raise PlatformClientError(f"Unable to save results to {output_zip_path}: {exc}") from exc
 
         return output_zip_path
+
+    def extract_results(self, zip_path: str, output_dir: str) -> List[str]:
+        """
+        Extract files from a downloaded result zip into output_dir.
+
+        Returns a list of absolute paths to the extracted files.
+        """
+        if not zipfile.is_zipfile(zip_path):
+            raise PlatformClientError(f"Downloaded file is not a valid zip: {zip_path}")
+
+        extracted = []
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for member in zf.infolist():
+                    if member.is_dir():
+                        continue
+                    dest = zf.extract(member, output_dir)
+                    extracted.append(os.path.abspath(dest))
+        except (OSError, zipfile.BadZipFile, RuntimeError, NotImplementedError) as exc:
+            raise PlatformClientError(f"Unable to extract results from {zip_path}: {exc}") from exc
+
+        return extracted
 
     # ------------------------------------------------------------
     # Internal request helpers
@@ -191,12 +230,14 @@ class PlatformClient:
                 raise PlatformAuthError("No access token available. Login is required.")
             headers["Authorization"] = f"Bearer {self.access_token}"
 
-        req = urllib.request.Request(url, data=body, headers=headers, method=method)
-
         try:
+            req = urllib.request.Request(url, data=body, headers=headers, method=method)
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 raw = resp.read().decode("utf-8")
-                return json.loads(raw) if raw else {}
+                response = json.loads(raw) if raw else {}
+                if not isinstance(response, dict):
+                    raise PlatformClientError("Backend API response must be a JSON object.")
+                return response
 
         except urllib.error.HTTPError as e:
             parsed = _parse_error_response(e)
@@ -227,6 +268,10 @@ class PlatformClient:
             raise PlatformClientError("Backend API request timed out.")
         except json.JSONDecodeError:
             raise PlatformClientError("Invalid JSON response from backend API.")
+        except UnicodeDecodeError as exc:
+            raise PlatformClientError("Invalid UTF-8 response from backend API.") from exc
+        except (OSError, http.client.HTTPException, ValueError) as exc:
+            raise PlatformClientError(f"Failed to read backend API response: {exc}") from exc
 
     def _public_base_url(self) -> str:
         if self.base_url.endswith("/v1"):

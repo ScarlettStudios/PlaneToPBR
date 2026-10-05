@@ -2,7 +2,11 @@ import os
 import sys
 import types
 import pytest
-from unittest.mock import patch, mock_open
+import io
+import json
+import zipfile
+from urllib.error import HTTPError
+from unittest.mock import patch, mock_open, MagicMock
 
 # Add repo root to sys.path
 HERE = os.path.dirname(__file__)
@@ -94,6 +98,8 @@ def test_apply_pbr_textures_skips_missing_channels(monkeypatch):
     textures = {}  # no channels
 
     result = utils.apply_pbr_textures(None, textures)
+
+    assert result is fake_mat
 
 def test_import_plane_invalid_payload(monkeypatch):
     from scripts import utils
@@ -674,3 +680,81 @@ def test_call_hf_pbr_wraps_exception(
         utils.call_hf_pbr("fake.png", "/tmp")
 
     assert "PBR generation failed" in str(ctx.value)
+
+
+def test_platform_pipeline_refresh_poll_download_extract(tmp_path):
+    image = tmp_path / "input.png"
+    image.write_bytes(b"input-image")
+    zip_data = io.BytesIO()
+    with zipfile.ZipFile(zip_data, "w") as archive:
+        archive.writestr("maps/base_color.png", b"diffuse-data")
+        archive.writestr("maps/normal.png", b"normal-data")
+        archive.writestr("maps/roughness.png", b"roughness-data")
+
+    def response(data):
+        context = MagicMock()
+        context.__enter__.return_value.read.return_value = data
+        return context
+
+    responses = [
+        HTTPError("https://example.com/jobs/pbr", 401, "Unauthorized", {}, io.BytesIO(b"{}")),
+        response(json.dumps({"access_token": "new-access", "refresh_token": "new-refresh"}).encode()),
+        response(b'{"job_id":"job123"}'),
+        response(b'{"status":"pending"}'),
+        response(b'{"status":"completed","download_url":"/public/job123.zip"}'),
+        response(zip_data.getvalue()),
+    ]
+    auth_state = {}
+    with patch("scripts.platform_client.urllib.request.urlopen", side_effect=responses) as urlopen, \
+         patch("scripts.utils.time.sleep") as sleep:
+        textures, tokens = utils.call_platform_pbr(str(image), str(tmp_path), "brick",
+                                                   "old-access", "old-refresh", auth_state=auth_state)
+    assert tokens == auth_state == {"access_token": "new-access", "refresh_token": "new-refresh"}
+    assert set(textures) == {"diffuse", "normal", "roughness"}
+    with open(textures["diffuse"], "rb") as source:
+        assert source.read() == b"diffuse-data"
+    requests = [call.args[0] for call in urlopen.call_args_list]
+    assert requests[0].get_header("Authorization") == "Bearer old-access"
+    assert requests[1].get_header("Authorization") is None
+    assert requests[2].get_header("Authorization") == "Bearer new-access"
+    assert requests[-1].get_header("Authorization") is None
+    sleep.assert_called_once_with(2)
+
+
+@pytest.mark.parametrize("failure_stage", ["create", "poll", "download", "extract"])
+def test_platform_pipeline_preserves_tokens_on_failure(tmp_path, failure_stage):
+    from scripts.platform_client import PlatformClientError
+    client = MagicMock()
+
+    def create(**kwargs):
+        client.access_token, client.refresh_token = "rotated-access", "rotated-refresh"
+        if failure_stage == "create":
+            raise PlatformClientError("create failed after refresh")
+        return {"job_id": "job123"}
+
+    client.create_pbr_job.side_effect = create
+    client.get_job_status.return_value = {"status": "completed", "download_url": "/public/results.zip"}
+    if failure_stage == "poll":
+        client.get_job_status.side_effect = PlatformClientError("poll failed")
+    elif failure_stage == "download":
+        client.download_results.side_effect = PlatformClientError("download failed")
+    elif failure_stage == "extract":
+        client.extract_results.side_effect = PlatformClientError("extract failed")
+    auth_state = {}
+    with patch("scripts.utils.PlatformClient", return_value=client):
+        with pytest.raises(PlatformClientError):
+            utils.call_platform_pbr("input.png", str(tmp_path), "brick",
+                                    "old-access", "old-refresh", auth_state=auth_state)
+    assert auth_state == {"access_token": "rotated-access", "refresh_token": "rotated-refresh"}
+
+
+def test_platform_pipeline_polling_timeout(tmp_path):
+    from scripts.platform_client import PlatformClientError
+    client = MagicMock()
+    client.create_pbr_job.return_value = {"job_id": "job123"}
+    client.get_job_status.return_value = {"status": "pending"}
+    with patch("scripts.utils.PlatformClient", return_value=client), patch("scripts.utils.time.sleep"):
+        with pytest.raises(PlatformClientError, match="polling timeout"):
+            utils.call_platform_pbr("input.png", str(tmp_path), "brick", "access", "refresh")
+    assert client.get_job_status.call_count == 60
+    client.download_results.assert_not_called()

@@ -1,6 +1,5 @@
 import os
 import time
-import zipfile
 import urllib.error
 import socket
 from datetime import datetime
@@ -166,7 +165,7 @@ def call_hf_pbr(image_path, output_dir, prompt=""):
         raise RuntimeError(f"PBR generation failed: {e}")
 
 
-def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_token=""):
+def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_token="", auth_state=None):
     """
     Call the ScarlettStudios Platform API to generate PBR textures.
 
@@ -180,6 +179,7 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
         prompt: Text prompt for PBR generation
         access_token: Platform API access token
         refresh_token: Platform API refresh token
+        auth_state: Optional dictionary updated with the latest tokens, even on failure
 
     Returns:
         tuple[dict, dict]: Texture paths plus updated auth tokens
@@ -194,6 +194,16 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
     client.access_token = access_token or None
     client.refresh_token = refresh_token or None
 
+    try:
+        return _run_platform_pbr_job(client, image_path, output_dir, prompt)
+    finally:
+        if auth_state is not None:
+            auth_state.update(access_token=client.access_token or "",
+                              refresh_token=client.refresh_token or "")
+
+
+def _run_platform_pbr_job(client, image_path, output_dir, prompt):
+    """Run the generation workflow using an existing client."""
     if not client.access_token:
         raise PlatformAuthError("No access token available. Login is required.")
 
@@ -221,23 +231,29 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
             if not download_url:
                 raise PlatformClientError("Job completed but no download_url provided")
 
-            # Download results
+            # Download and extract results
             output_zip = os.path.join(output_dir, f"{job_id}.zip")
             client.download_results(download_url, output_zip)
 
-            # Extract textures
             extract_dir = os.path.join(output_dir, job_id)
-            os.makedirs(extract_dir, exist_ok=True)
-            with zipfile.ZipFile(output_zip, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
+            extracted_files = client.extract_results(output_zip, extract_dir)
 
-            # Build texture dictionary (adjust based on actual file naming)
-            textures = {
-                "diffuse": os.path.join(extract_dir, "base_color.png"),
-                "normal": os.path.join(extract_dir, "normal.png"),
-                "roughness": os.path.join(extract_dir, "roughness.png"),
-                "metallic": os.path.join(extract_dir, "metallic.png"),
-            }
+            # Map extracted files to texture slots by filename keywords
+            textures = {}
+            for path in extracted_files:
+                name = os.path.basename(path).lower()
+                if any(k in name for k in ("albedo", "base_color", "diffuse", "color")):
+                    textures.setdefault("diffuse", path)
+                elif "normal" in name:
+                    textures.setdefault("normal", path)
+                elif "rough" in name:
+                    textures.setdefault("roughness", path)
+                elif "metal" in name:
+                    textures.setdefault("metallic", path)
+                elif "depth" in name or "height" in name:
+                    textures.setdefault("depth", path)
+                elif "mask" in name or "ao" in name:
+                    textures.setdefault("mask", path)
 
             auth_state = {
                 "access_token": client.access_token or "",

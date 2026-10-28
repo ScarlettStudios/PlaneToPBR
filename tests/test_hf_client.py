@@ -10,14 +10,14 @@ if REPO_ROOT not in sys.path:
 
 import json
 import unittest
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
 
 from scripts.hf_client import (
-    _resolve_fn_index,
+    _download_file,
+    _download_results,
     _join_queue,
     _poll_queue,
-    _download_results,
-    _download_file,
+    _resolve_fn_index,
 )
 
 

@@ -1,5 +1,7 @@
 import bpy
+
 from .addon_runtime import get_addon_preferences
+
 
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """

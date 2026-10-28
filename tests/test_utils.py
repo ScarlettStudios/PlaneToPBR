@@ -1,12 +1,13 @@
+import io
+import json
 import os
 import sys
 import types
-import pytest
-import io
-import json
 import zipfile
+from unittest.mock import MagicMock, mock_open, patch
 from urllib.error import HTTPError
-from unittest.mock import patch, mock_open, MagicMock
+
+import pytest
 
 # Add repo root to sys.path
 HERE = os.path.dirname(__file__)

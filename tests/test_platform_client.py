@@ -1,14 +1,14 @@
-import os
-import sys
-import json
 import base64
 import io
+import json
+import os
+import sys
 import tempfile
+import unittest
 import zipfile
 from http.client import IncompleteRead
+from unittest.mock import MagicMock, mock_open, patch
 from urllib.error import HTTPError, URLError
-import unittest
-from unittest.mock import patch, mock_open, MagicMock
 
 # Add repo root to sys.path
 HERE = os.path.dirname(__file__)
@@ -18,12 +18,12 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from scripts.platform_client import (
+    PlatformAuthError,
     PlatformClient,
     PlatformClientError,
-    PlatformAuthError,
     PlatformHTTPError,
-    _parse_error_response,
     _guess_mime_type,
+    _parse_error_response,
 )
 
 
@@ -343,8 +343,7 @@ class TestPlatformClient(unittest.TestCase):
     @patch("scripts.platform_client.urllib.request.urlopen")
     def test_download_results_timeout(self, mock_urlopen):
         """Test download_results handles timeout."""
-        import socket
-        mock_urlopen.side_effect = socket.timeout()
+        mock_urlopen.side_effect = TimeoutError()
 
         client = PlatformClient()
 

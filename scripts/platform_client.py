@@ -2,13 +2,10 @@ import base64
 import http.client
 import json
 import os
-import socket
 import urllib.error
 import urllib.request
-from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 import zipfile
-from typing import Dict, List, Optional
-
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 DEFAULT_TIMEOUT = 60
 DEFAULT_BASE_URL = os.getenv("PLANETOPBR_API_BASE_URL", "http://127.0.0.1:8001")
@@ -25,7 +22,7 @@ class PlatformAuthError(PlatformClientError):
 class PlatformHTTPError(PlatformClientError):
     """Raised for non-auth HTTP failures with parsed backend error details."""
 
-    def __init__(self, status_code: int, code: str, message: str, request_id: Optional[str] = None):
+    def __init__(self, status_code: int, code: str, message: str, request_id: str | None = None):
         self.status_code = status_code
         self.code = code
         self.request_id = request_id
@@ -45,14 +42,14 @@ class PlatformClient:
     def __init__(self, base_url: str = DEFAULT_BASE_URL, timeout: int = DEFAULT_TIMEOUT):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
-        self.access_token: Optional[str] = None
-        self.refresh_token: Optional[str] = None
+        self.access_token: str | None = None
+        self.refresh_token: str | None = None
 
     # ------------------------------------------------------------
     # Public API methods
     # ------------------------------------------------------------
 
-    def login(self, email: str, password: str) -> Dict:
+    def login(self, email: str, password: str) -> dict:
         payload = {"email": email, "password": password}
         response = self._request_json("POST", "/auth/login", payload=payload, auth_required=False)
 
@@ -64,7 +61,7 @@ class PlatformClient:
         self.refresh_token = response.get("refresh_token")
         return response
 
-    def start_browser_login(self, mode: str = "login") -> Dict:
+    def start_browser_login(self, mode: str = "login") -> dict:
         response = self._request_json("POST", "/auth/browser/start", auth_required=False)
         authorize_url = response.get("authorize_url")
         if authorize_url:
@@ -77,16 +74,16 @@ class PlatformClient:
             response["authorize_url"] = urlunsplit(parts._replace(query=urlencode(query)))
         return response
 
-    def get_browser_login_status(self, session_id: str) -> Dict:
+    def get_browser_login_status(self, session_id: str) -> dict:
         return self._request_json("GET", f"/auth/browser/status/{session_id}", auth_required=False)
 
-    def cancel_browser_login(self, session_id: str) -> Dict:
+    def cancel_browser_login(self, session_id: str) -> dict:
         return self._request_json("POST", f"/auth/browser/cancel/{session_id}", auth_required=False)
 
-    def get_me(self) -> Dict:
+    def get_me(self) -> dict:
         return self._request_json("GET", "/auth/me", auth_required=True)
 
-    def refresh_access_token(self) -> Dict:
+    def refresh_access_token(self) -> dict:
         """Refresh and store a new access token using the refresh token."""
         if not self.refresh_token:
             raise PlatformAuthError("No refresh token available. Login is required.")
@@ -106,7 +103,7 @@ class PlatformClient:
         self.refresh_token = response.get("refresh_token", self.refresh_token)
         return response
 
-    def get_balance(self) -> Dict:
+    def get_balance(self) -> dict:
         """Fetch authenticated user's token balance."""
         return self._request_json("GET", "/wallet", auth_required=True)
 
@@ -116,8 +113,8 @@ class PlatformClient:
         prompt: str = "",
         output_format: str = "png",
         return_mask: bool = True,
-        client_request_id: Optional[str] = None,
-    ) -> Dict:
+        client_request_id: str | None = None,
+    ) -> dict:
         """
         Create a backend-managed PBR generation job.
 
@@ -153,7 +150,7 @@ class PlatformClient:
 
         return self._request_json("POST", "/jobs/pbr", payload=payload, auth_required=True)
 
-    def get_job_status(self, job_id: str) -> Dict:
+    def get_job_status(self, job_id: str) -> dict:
         """Fetch status for a previously created job."""
         return self._request_json("GET", f"/jobs/{job_id}", auth_required=True)
 
@@ -169,11 +166,11 @@ class PlatformClient:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 data = resp.read()
         except urllib.error.HTTPError as e:
-            raise PlatformHTTPError(e.code, "DOWNLOAD_FAILED", f"Failed to download results: {e.reason}")
+            raise PlatformHTTPError(e.code, "DOWNLOAD_FAILED", f"Failed to download results: {e.reason}") from e
         except urllib.error.URLError as e:
-            raise PlatformClientError(f"Network error downloading results: {e.reason}")
-        except socket.timeout:
-            raise PlatformClientError("Result download timed out.")
+            raise PlatformClientError(f"Network error downloading results: {e.reason}") from e
+        except TimeoutError as e:
+            raise PlatformClientError("Result download timed out.") from e
         except (OSError, http.client.HTTPException, ValueError) as exc:
             raise PlatformClientError(f"Failed to read result download: {exc}") from exc
 
@@ -186,7 +183,7 @@ class PlatformClient:
 
         return output_zip_path
 
-    def extract_results(self, zip_path: str, output_dir: str) -> List[str]:
+    def extract_results(self, zip_path: str, output_dir: str) -> list[str]:
         """
         Extract files from a downloaded result zip into output_dir.
 
@@ -217,10 +214,10 @@ class PlatformClient:
         self,
         method: str,
         path: str,
-        payload: Optional[Dict] = None,
+        payload: dict | None = None,
         auth_required: bool = True,
         retry_on_401: bool = True,
-    ) -> Dict:
+    ) -> dict:
         url = f"{self.base_url}{path}"
         body = json.dumps(payload).encode("utf-8") if payload is not None else None
 
@@ -253,21 +250,21 @@ class PlatformClient:
                 )
 
             if e.code == 401:
-                raise PlatformAuthError(parsed["message"])
+                raise PlatformAuthError(parsed["message"]) from e
 
             raise PlatformHTTPError(
                 status_code=e.code,
                 code=parsed["code"],
                 message=parsed["message"],
                 request_id=parsed.get("request_id"),
-            )
+            ) from e
 
         except urllib.error.URLError as e:
-            raise PlatformClientError(f"Network error calling backend API: {e.reason}")
-        except socket.timeout:
-            raise PlatformClientError("Backend API request timed out.")
-        except json.JSONDecodeError:
-            raise PlatformClientError("Invalid JSON response from backend API.")
+            raise PlatformClientError(f"Network error calling backend API: {e.reason}") from e
+        except TimeoutError as e:
+            raise PlatformClientError("Backend API request timed out.") from e
+        except json.JSONDecodeError as e:
+            raise PlatformClientError("Invalid JSON response from backend API.") from e
         except UnicodeDecodeError as exc:
             raise PlatformClientError("Invalid UTF-8 response from backend API.") from exc
         except (OSError, http.client.HTTPException, ValueError) as exc:
@@ -279,7 +276,7 @@ class PlatformClient:
         return self.base_url
 
 
-def _parse_error_response(http_error: urllib.error.HTTPError) -> Dict[str, Optional[str]]:
+def _parse_error_response(http_error: urllib.error.HTTPError) -> dict[str, str | None]:
     """Parse standard backend error envelope; fallback to generic values."""
     fallback = {
         "code": "HTTP_ERROR",

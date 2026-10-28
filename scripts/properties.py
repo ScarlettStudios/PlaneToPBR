@@ -1,5 +1,6 @@
 import bpy
 from bpy.props import BoolProperty, IntProperty, StringProperty
+
 from .addon_runtime import BASE_PACKAGE
 
 

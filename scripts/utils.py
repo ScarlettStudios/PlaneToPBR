@@ -1,17 +1,19 @@
 import os
 import time
 import urllib.error
-import socket
 from datetime import datetime
+
 import bpy
-from .platform_client import PlatformAuthError, PlatformClient, PlatformClientError
+
 from .hf_client import (
-    _resolve_fn_index,
-    _upload_file,
+    _download_results,
     _join_queue,
     _poll_queue,
-    _download_results,
+    _resolve_fn_index,
+    _upload_file,
 )
+from .platform_client import PlatformAuthError, PlatformClient, PlatformClientError
+
 
 def import_plane_from_image(textures):
     """
@@ -33,7 +35,7 @@ def import_plane_from_image(textures):
     try:
         img = bpy.data.images.load(diffuse_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to load diffuse image: {e}")
+        raise RuntimeError(f"Failed to load diffuse image: {e}") from e
 
     # Prevent divide-by-zero errors
     if img.size[1] == 0:
@@ -51,7 +53,7 @@ def import_plane_from_image(textures):
         bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
         plane = bpy.context.active_object
     except Exception as e:
-        raise RuntimeError(f"Failed to create plane: {e}")
+        raise RuntimeError(f"Failed to create plane: {e}") from e
 
     # Scale plane to match texture proportions
     plane.scale = (width / 2, height / 2, 1)
@@ -71,7 +73,7 @@ def import_plane_from_image(textures):
     try:
         plane.data.materials.append(mat)
     except Exception as e:
-        raise RuntimeError(f"Failed to assign material: {e}")
+        raise RuntimeError(f"Failed to assign material: {e}") from e
 
     # ------------------------------------------------------------
     # Add subdivision + displacement modifiers
@@ -158,11 +160,11 @@ def call_hf_pbr(image_path, output_dir, prompt=""):
         return _download_results(output, output_dir, timestamp, diffuse_path)
 
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}")
-    except socket.timeout:
-        raise RuntimeError("Request to Hugging Face Space timed out.")
+        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}") from e
+    except TimeoutError as e:
+        raise RuntimeError("Request to Hugging Face Space timed out.") from e
     except Exception as e:
-        raise RuntimeError(f"PBR generation failed: {e}")
+        raise RuntimeError(f"PBR generation failed: {e}") from e
 
 
 def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_token="", auth_state=None):
@@ -319,7 +321,7 @@ def add_modifiers(plane, textures):
         disp = plane.modifiers["Displace"]
 
     except Exception as e:
-        raise RuntimeError(f"Failed to add modifiers: {e}")
+        raise RuntimeError(f"Failed to add modifiers: {e}") from e
 
     # Apply depth map as displacement texture
     if textures.get("depth"):
@@ -331,7 +333,7 @@ def add_modifiers(plane, textures):
             displacement_texture.image.colorspace_settings.name = 'Non-Color'
             disp.texture = displacement_texture
         except Exception as e:
-            raise RuntimeError(f"Failed to load depth texture: {e}")
+            raise RuntimeError(f"Failed to load depth texture: {e}") from e
 
     # Configure displacement settings
     disp.texture_coords = 'UV'
@@ -350,7 +352,7 @@ def _create_base_material():
         mat = bpy.data.materials.new(name="PBR_Material")
         mat.use_nodes = True
     except Exception as e:
-        raise RuntimeError(f"Failed to create base material: {e}")
+        raise RuntimeError(f"Failed to create base material: {e}") from e
 
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
@@ -389,7 +391,7 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
         diffuse_node = nodes.new(type="ShaderNodeTexImage")
         diffuse_node.image = bpy.data.images.load(diffuse_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to load diffuse texture node: {e}")
+        raise RuntimeError(f"Failed to load diffuse texture node: {e}") from e
 
     diffuse_node.location = (-400, 300)
 
@@ -410,7 +412,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     try:
         roughness_node.image = bpy.data.images.load(textures["roughness"])
     except Exception as e:
-        raise RuntimeError(f"Failed to load roughness map: {e}")
+        raise RuntimeError(f"Failed to load roughness map: {e}") from e
     roughness_node.image.colorspace_settings.name = "Non-Color"
     roughness_node.location = (-400, 100)
 
@@ -418,7 +420,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     try:
         mask_node.image = bpy.data.images.load(textures["mask"])
     except Exception as e:
-        raise RuntimeError(f"Failed to load mask map: {e}")
+        raise RuntimeError(f"Failed to load mask map: {e}") from e
     mask_node.image.colorspace_settings.name = "Non-Color"
     mask_node.location = (-400, -100)
 
@@ -450,7 +452,7 @@ def _add_normal(nodes, links, bsdf, mapping, normal_path):
     try:
         normal_node.image = bpy.data.images.load(normal_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to load normal map: {e}")
+        raise RuntimeError(f"Failed to load normal map: {e}") from e
     normal_node.image.colorspace_settings.name = "Non-Color"
     normal_node.location = (-400, -300)
 

@@ -1,11 +1,12 @@
-import bpy
 import threading
 import webbrowser
 from queue import Empty, Queue
 
+import bpy
+
 from .addon_runtime import get_addon_preferences
-from .utils import import_plane_from_image, get_project_texture_dir, call_hf_pbr, call_platform_pbr
 from .platform_client import PlatformClient, PlatformClientError
+from .utils import call_hf_pbr, call_platform_pbr, get_project_texture_dir, import_plane_from_image
 
 
 def _redraw_preferences():

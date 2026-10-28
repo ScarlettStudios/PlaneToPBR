@@ -1,8 +1,8 @@
 import os
 import sys
+import threading
 import types
 import unittest
-import threading
 from unittest.mock import MagicMock, patch
 
 # Add repo root
@@ -28,8 +28,8 @@ sys.modules["bpy"] = mock_bpy
 from scripts.operators import (
     OBJECT_OT_import_plane_from_image,
     OBJECT_OT_import_plane_from_platform,
-    PLANETOPBR_OT_platform_login,
     PLANETOPBR_OT_platform_cancel_login,
+    PLANETOPBR_OT_platform_login,
     PLANETOPBR_OT_platform_logout,
 )
 from scripts.platform_client import PlatformClientError

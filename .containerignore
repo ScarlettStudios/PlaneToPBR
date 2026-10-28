@@ -1,0 +1,15 @@
+# Only files needed by the build belong in the context. This also keeps local
+# credentials, virtual environments, assets, and release zips out.
+**
+!Containerfile
+!.containerignore
+!requirements-dev.txt
+!ruff.toml
+!pytest.ini
+!__init__.py
+!scripts/
+!scripts/**
+!tests/
+!tests/**
+**/__pycache__/
+**/*.pyc

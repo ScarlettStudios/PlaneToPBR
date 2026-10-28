@@ -47,11 +47,13 @@ def _store_platform_tokens(prefs, auth_state):
 
 def _cancel_browser_session(session_id):
     """Cancel remotely without delaying Blender's UI."""
+
     def cancel():
         try:
             PlatformClient().cancel_browser_login(session_id)
         except PlatformClientError:
             pass
+
     threading.Thread(target=cancel, daemon=True).start()
 
 
@@ -59,7 +61,7 @@ def _open_browser_url(url):
     opened = False
     try:
         result = bpy.ops.wm.url_open(url=url)
-        opened = 'FINISHED' in result
+        opened = "FINISHED" in result
     except Exception:
         opened = False
 
@@ -76,7 +78,7 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
     bl_idname = "planetopbr.platform_login"
     bl_label = "PlaneToPBR Platform Login"
 
-    mode: bpy.props.StringProperty(default="login", options={'HIDDEN'})
+    mode: bpy.props.StringProperty(default="login", options={"HIDDEN"})
 
     _timer = None
     _client = None
@@ -90,8 +92,8 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
                 raise RuntimeError("PlaneToPBR preferences are unavailable.")
 
             if prefs.platform_login_in_progress:
-                self.report({'ERROR'}, "PlaneToPBR Pro login is already in progress.")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, "PlaneToPBR Pro login is already in progress.")
+                return {"CANCELLED"}
 
             self._client = PlatformClient()
             self._results = Queue()
@@ -106,8 +108,10 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
             wm = context.window_manager
             self._timer = wm.event_timer_add(1.0, window=context.window)
             wm.modal_handler_add(self)
-            self._start_request("start", self._client.start_browser_login, mode=self.mode or "login")
-            return {'RUNNING_MODAL'}
+            self._start_request(
+                "start", self._client.start_browser_login, mode=self.mode or "login"
+            )
+            return {"RUNNING_MODAL"}
         except Exception as e:
             if prefs is not None:
                 prefs.platform_browser_session_id = ""
@@ -115,8 +119,8 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
                 prefs.platform_login_in_progress = False
                 _redraw_preferences()
             self._finish(context)
-            self.report({'ERROR'}, str(e))
-            return {'CANCELLED'}
+            self.report({"ERROR"}, str(e))
+            return {"CANCELLED"}
 
     def _start_request(self, kind, request, *args, **kwargs):
         self._request_pending = True
@@ -149,33 +153,42 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
             account = _fetch_platform_account_state(self._client)
         except PlatformClientError:
             account = None
-        return {"account": account, "auth_state": {
-            "access_token": self._client.access_token or "",
-            "refresh_token": self._client.refresh_token or "",
-        }}
+        return {
+            "account": account,
+            "auth_state": {
+                "access_token": self._client.access_token or "",
+                "refresh_token": self._client.refresh_token or "",
+            },
+        }
 
     def modal(self, context, event):
-        if event.type != 'TIMER':
-            return {'PASS_THROUGH'}
+        if event.type != "TIMER":
+            return {"PASS_THROUGH"}
 
         prefs = get_addon_preferences(context)
         if prefs is None:
             self._finish(context)
-            self.report({'ERROR'}, "PlaneToPBR preferences are unavailable.")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "PlaneToPBR preferences are unavailable.")
+            return {"CANCELLED"}
 
-        if PLANETOPBR_OT_platform_login._active_login is not self or not prefs.platform_login_in_progress:
+        if (
+            PLANETOPBR_OT_platform_login._active_login is not self
+            or not prefs.platform_login_in_progress
+        ):
             self._finish(context)
-            return {'CANCELLED'}
+            return {"CANCELLED"}
 
         try:
             try:
                 kind, value, error = self._results.get_nowait()
             except Empty:
                 if not self._request_pending and prefs.platform_browser_session_id:
-                    self._start_request("status", self._client.get_browser_login_status,
-                                        prefs.platform_browser_session_id)
-                return {'PASS_THROUGH'}
+                    self._start_request(
+                        "status",
+                        self._client.get_browser_login_status,
+                        prefs.platform_browser_session_id,
+                    )
+                return {"PASS_THROUGH"}
 
             self._request_pending = False
             if error is not None:
@@ -196,22 +209,22 @@ class PLANETOPBR_OT_platform_login(bpy.types.Operator):
                     _apply_platform_account_state(prefs, value["account"])
                 self._clear_browser_state(prefs)
                 self._finish(context)
-                self.report({'INFO'}, "PlaneToPBR Pro login complete.")
-                return {'FINISHED'}
+                self.report({"INFO"}, "PlaneToPBR Pro login complete.")
+                return {"FINISHED"}
             elif value.get("status") == "approved":
                 self._start_request("account", self._complete_login, value)
             elif value.get("status") in {"cancelled", "expired", "failed"}:
                 state = value["status"]
                 self._clear_browser_state(prefs)
                 self._finish(context)
-                self.report({'WARNING'}, f"PlaneToPBR Pro login {state}.")
-                return {'CANCELLED'}
+                self.report({"WARNING"}, f"PlaneToPBR Pro login {state}.")
+                return {"CANCELLED"}
         except Exception as exc:
             self.cancel(context)
-            self.report({'ERROR'}, str(exc))
-            return {'CANCELLED'}
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
 
-        return {'PASS_THROUGH'}
+        return {"PASS_THROUGH"}
 
     @staticmethod
     def _clear_browser_state(prefs):
@@ -266,8 +279,8 @@ class PLANETOPBR_OT_platform_cancel_login(bpy.types.Operator):
     def execute(self, context):
         prefs = get_addon_preferences(context)
         if prefs is None:
-            self.report({'ERROR'}, "PlaneToPBR preferences are unavailable.")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "PlaneToPBR preferences are unavailable.")
+            return {"CANCELLED"}
 
         active = PLANETOPBR_OT_platform_login._active_login
         if active is not None:
@@ -278,8 +291,8 @@ class PLANETOPBR_OT_platform_cancel_login(bpy.types.Operator):
             if session_id:
                 _cancel_browser_session(session_id)
 
-        self.report({'INFO'}, "PlaneToPBR Pro login cancelled.")
-        return {'FINISHED'}
+        self.report({"INFO"}, "PlaneToPBR Pro login cancelled.")
+        return {"FINISHED"}
 
 
 class PLANETOPBR_OT_platform_open_browser(bpy.types.Operator):
@@ -291,17 +304,17 @@ class PLANETOPBR_OT_platform_open_browser(bpy.types.Operator):
     def execute(self, context):
         prefs = get_addon_preferences(context)
         if prefs is None or not prefs.platform_browser_authorize_url:
-            self.report({'ERROR'}, "No browser login URL is available.")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, "No browser login URL is available.")
+            return {"CANCELLED"}
 
         try:
             _open_browser_url(prefs.platform_browser_authorize_url)
         except Exception as exc:
-            self.report({'ERROR'}, str(exc))
-            return {'CANCELLED'}
+            self.report({"ERROR"}, str(exc))
+            return {"CANCELLED"}
 
-        self.report({'INFO'}, "Opened browser login page.")
-        return {'FINISHED'}
+        self.report({"INFO"}, "Opened browser login page.")
+        return {"FINISHED"}
 
 
 class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
@@ -328,11 +341,12 @@ class PLANETOPBR_OT_platform_logout(bpy.types.Operator):
             prefs.platform_login_in_progress = False
             prefs.platform_logged_in = False
             _redraw_preferences()
-            self.report({'INFO'}, "Logged out of PlaneToPBR Pro.")
-            return {'FINISHED'}
+            self.report({"INFO"}, "Logged out of PlaneToPBR Pro.")
+            return {"FINISHED"}
         except Exception as e:
-            self.report({'ERROR'}, str(e))
-            return {'CANCELLED'}
+            self.report({"ERROR"}, str(e))
+            return {"CANCELLED"}
+
 
 class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
     """
@@ -345,7 +359,7 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
 
     bl_idname = "object.import_plane_from_image"
     bl_label = "Import Plane from Image (HF)"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     # Runtime state variables
     _timer = None  # Blender event timer
@@ -367,9 +381,7 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
             textures_dir = get_project_texture_dir()
 
             self._textures = call_hf_pbr(
-                image_path=filepath,
-                output_dir=textures_dir,
-                prompt=prompt
+                image_path=filepath, output_dir=textures_dir, prompt=prompt
             )
         except Exception as e:
             self._textures = None
@@ -377,7 +389,6 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
         finally:
             # Signal modal loop that processing is finished
             self._done = True
-
 
     # ----------------------------
     # EXECUTE
@@ -393,8 +404,8 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
 
             # Ensure image is selected
             if not image_path:
-                self.report({'ERROR'}, "No image selected")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, "No image selected")
+                return {"CANCELLED"}
 
             # Reset runtime state
             self._done = False
@@ -404,9 +415,7 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
 
             # Start HF background thread (non-blocking)
             self._thread = threading.Thread(
-                target=self._run_hf,
-                args=(image_path, prompt),
-                daemon=True
+                target=self._run_hf, args=(image_path, prompt), daemon=True
             )
             self._thread.start()
 
@@ -418,11 +427,11 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
             self._timer = wm.event_timer_add(0.1, window=context.window)
             wm.modal_handler_add(self)
 
-            return {'RUNNING_MODAL'}
+            return {"RUNNING_MODAL"}
 
         except Exception as e:
-            self.report({'ERROR'}, f"Unexpected error: {e}")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, f"Unexpected error: {e}")
+            return {"CANCELLED"}
 
     # ----------------------------
     # MODAL LOOP
@@ -431,14 +440,14 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
         """
         Runs repeatedly while operator is active.
         """
-        if event.type == 'TIMER':
+        if event.type == "TIMER":
             wm = context.window_manager
 
             # While HF processing is still running
             if not self._done:
                 self._progress = (self._progress + 2) % 100
                 wm.progress_update(self._progress)
-                return {'PASS_THROUGH'}
+                return {"PASS_THROUGH"}
 
             # Processing finished → cleanup timer
             wm.event_timer_remove(self._timer)
@@ -446,24 +455,24 @@ class OBJECT_OT_import_plane_from_image(bpy.types.Operator):
 
             # If HF returned an error
             if self._error_message:
-                self.report({'ERROR'}, self._error_message)
-                return {'CANCELLED'}
+                self.report({"ERROR"}, self._error_message)
+                return {"CANCELLED"}
 
             # Attempt to import generated textures
             try:
                 if self._textures:
                     import_plane_from_image(self._textures)
-                    self.report({'INFO'}, "PBR textures imported.")
-                    return {'FINISHED'}
+                    self.report({"INFO"}, "PBR textures imported.")
+                    return {"FINISHED"}
                 else:
-                    self.report({'ERROR'}, "Failed to generate PBR textures.")
-                    return {'CANCELLED'}
+                    self.report({"ERROR"}, "Failed to generate PBR textures.")
+                    return {"CANCELLED"}
 
             except Exception as e:
-                self.report({'ERROR'}, f"Import failed: {e}")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, f"Import failed: {e}")
+                return {"CANCELLED"}
 
-        return {'PASS_THROUGH'}
+        return {"PASS_THROUGH"}
 
 
 class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
@@ -477,7 +486,7 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
 
     bl_idname = "object.import_plane_from_platform"
     bl_label = "Import Plane from Image (Platform)"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     # Runtime state variables
     _timer = None  # Blender event timer
@@ -518,15 +527,15 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             except PlatformClientError:
                 pass
             finally:
-                self._updated_auth_state.update(access_token=client.access_token or "",
-                                                refresh_token=client.refresh_token or "")
+                self._updated_auth_state.update(
+                    access_token=client.access_token or "", refresh_token=client.refresh_token or ""
+                )
         except Exception as e:
             self._textures = None
             self._error_message = str(e)
         finally:
             # Signal modal loop that processing is finished
             self._platform_done = True
-
 
     # ----------------------------
     # EXECUTE
@@ -542,8 +551,8 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
 
             # Ensure image is selected
             if not image_path:
-                self.report({'ERROR'}, "No image selected")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, "No image selected")
+                return {"CANCELLED"}
 
             prefs = get_addon_preferences(context)
             if prefs is None:
@@ -552,8 +561,10 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             refresh_token = getattr(prefs, "platform_refresh_token", "")
 
             if not access_token:
-                self.report({'ERROR'}, "PlaneToPBR Pro login required in Preferences > Get Extensions.")
-                return {'CANCELLED'}
+                self.report(
+                    {"ERROR"}, "PlaneToPBR Pro login required in Preferences > Get Extensions."
+                )
+                return {"CANCELLED"}
 
             # Reset runtime state
             self._platform_done = False
@@ -567,7 +578,7 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             self._platform_thread = threading.Thread(
                 target=self._run_platform_api,
                 args=(image_path, prompt, access_token, refresh_token),
-                daemon=True
+                daemon=True,
             )
             self._platform_thread.start()
 
@@ -579,11 +590,11 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             self._timer = wm.event_timer_add(0.1, window=context.window)
             wm.modal_handler_add(self)
 
-            return {'RUNNING_MODAL'}
+            return {"RUNNING_MODAL"}
 
         except Exception as e:
-            self.report({'ERROR'}, f"Unexpected error: {e}")
-            return {'CANCELLED'}
+            self.report({"ERROR"}, f"Unexpected error: {e}")
+            return {"CANCELLED"}
 
     # ----------------------------
     # MODAL LOOP
@@ -592,14 +603,14 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
         """
         Runs repeatedly while operator is active.
         """
-        if event.type == 'TIMER':
+        if event.type == "TIMER":
             wm = context.window_manager
 
             # While Platform API processing is still running
             if not self._platform_done:
                 self._progress = (self._progress + 2) % 100
                 wm.progress_update(self._progress)
-                return {'PASS_THROUGH'}
+                return {"PASS_THROUGH"}
 
             # Processing finished → cleanup timer
             wm.event_timer_remove(self._timer)
@@ -608,37 +619,38 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
             if self._updated_auth_state:
                 prefs = get_addon_preferences(context)
                 if prefs is None:
-                    self.report({'ERROR'}, "PlaneToPBR preferences are unavailable.")
-                    return {'CANCELLED'}
+                    self.report({"ERROR"}, "PlaneToPBR preferences are unavailable.")
+                    return {"CANCELLED"}
                 _store_platform_tokens(prefs, self._updated_auth_state)
                 if self._account_state is not None:
                     _apply_platform_account_state(prefs, self._account_state)
 
             # Save rotated tokens even if generation or download failed.
             if self._error_message:
-                self.report({'ERROR'}, self._error_message)
-                return {'CANCELLED'}
+                self.report({"ERROR"}, self._error_message)
+                return {"CANCELLED"}
 
             # Attempt to import generated textures
             try:
                 if self._textures:
                     import_plane_from_image(self._textures)
-                    self.report({'INFO'}, "PBR textures imported.")
-                    return {'FINISHED'}
+                    self.report({"INFO"}, "PBR textures imported.")
+                    return {"FINISHED"}
                 else:
-                    self.report({'ERROR'}, "Failed to generate PBR textures.")
-                    return {'CANCELLED'}
+                    self.report({"ERROR"}, "Failed to generate PBR textures.")
+                    return {"CANCELLED"}
 
             except Exception as e:
-                self.report({'ERROR'}, f"Import failed: {e}")
-                return {'CANCELLED'}
+                self.report({"ERROR"}, f"Import failed: {e}")
+                return {"CANCELLED"}
 
-        return {'PASS_THROUGH'}
+        return {"PASS_THROUGH"}
 
 
 # ------------------------------------------------------------
 # Registration
 # ------------------------------------------------------------
+
 
 def register():
     """Register the operators with Blender."""
@@ -649,6 +661,7 @@ def register():
     bpy.utils.register_class(PLANETOPBR_OT_platform_logout)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
     bpy.utils.register_class(OBJECT_OT_import_plane_from_platform)
+
 
 def unregister():
     """Unregister the operators from Blender."""

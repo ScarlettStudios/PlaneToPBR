@@ -80,6 +80,7 @@ def import_plane_from_image(textures):
     # ------------------------------------------------------------
     add_modifiers(plane, textures)
 
+
 def get_project_texture_dir():
     """
     Return the PlaneToPBR texture output directory
@@ -87,9 +88,7 @@ def get_project_texture_dir():
     """
 
     if not bpy.data.filepath:
-        raise RuntimeError(
-            "Please save the Blender project before generating textures."
-        )
+        raise RuntimeError("Please save the Blender project before generating textures.")
 
     project_dir = bpy.path.abspath("//")
     textures_dir = os.path.join(project_dir, "PlaneToPBR_textures")
@@ -167,7 +166,9 @@ def call_hf_pbr(image_path, output_dir, prompt=""):
         raise RuntimeError(f"PBR generation failed: {e}") from e
 
 
-def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_token="", auth_state=None):
+def call_platform_pbr(
+    image_path, output_dir, prompt, access_token, refresh_token="", auth_state=None
+):
     """
     Call the ScarlettStudios Platform API to generate PBR textures.
 
@@ -200,8 +201,9 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
         return _run_platform_pbr_job(client, image_path, output_dir, prompt)
     finally:
         if auth_state is not None:
-            auth_state.update(access_token=client.access_token or "",
-                              refresh_token=client.refresh_token or "")
+            auth_state.update(
+                access_token=client.access_token or "", refresh_token=client.refresh_token or ""
+            )
 
 
 def _run_platform_pbr_job(client, image_path, output_dir, prompt):
@@ -211,10 +213,7 @@ def _run_platform_pbr_job(client, image_path, output_dir, prompt):
 
     # Create PBR job
     job_response = client.create_pbr_job(
-        image_path=image_path,
-        prompt=prompt,
-        output_format="png",
-        return_mask=True
+        image_path=image_path, prompt=prompt, output_format="png", return_mask=True
     )
 
     job_id = job_response.get("job_id")
@@ -274,6 +273,7 @@ def _run_platform_pbr_job(client, image_path, output_dir, prompt):
 
     raise PlatformClientError("Job polling timeout: max attempts reached")
 
+
 def apply_pbr_textures(plane, textures):
     """
     Build a node-based Principled BSDF material and attach
@@ -296,6 +296,7 @@ def apply_pbr_textures(plane, textures):
 
     return mat
 
+
 def add_modifiers(plane, textures):
     """
     Add subdivision and displacement modifiers to the plane.
@@ -303,21 +304,21 @@ def add_modifiers(plane, textures):
     """
     try:
         # High-level subdivision for displacement detail
-        bpy.ops.object.modifier_add(type='SUBSURF')
+        bpy.ops.object.modifier_add(type="SUBSURF")
         sub1 = plane.modifiers["Subdivision"]
-        sub1.subdivision_type = 'SIMPLE'
+        sub1.subdivision_type = "SIMPLE"
         sub1.levels = 6
         sub1.render_levels = 6
 
         # Secondary subdivision layer
-        bpy.ops.object.modifier_add(type='SUBSURF')
+        bpy.ops.object.modifier_add(type="SUBSURF")
         sub2 = plane.modifiers["Subdivision.001"]
-        sub2.subdivision_type = 'SIMPLE'
+        sub2.subdivision_type = "SIMPLE"
         sub2.levels = 1
         sub2.render_levels = 1
 
         # Displacement modifier
-        bpy.ops.object.modifier_add(type='DISPLACE')
+        bpy.ops.object.modifier_add(type="DISPLACE")
         disp = plane.modifiers["Displace"]
 
     except Exception as e:
@@ -326,22 +327,23 @@ def add_modifiers(plane, textures):
     # Apply depth map as displacement texture
     if textures.get("depth"):
         try:
-            displacement_texture = bpy.data.textures.new(
-                name="DisplacementTexture", type='IMAGE'
-            )
+            displacement_texture = bpy.data.textures.new(name="DisplacementTexture", type="IMAGE")
             displacement_texture.image = bpy.data.images.load(textures["depth"])
-            displacement_texture.image.colorspace_settings.name = 'Non-Color'
+            displacement_texture.image.colorspace_settings.name = "Non-Color"
             disp.texture = displacement_texture
         except Exception as e:
             raise RuntimeError(f"Failed to load depth texture: {e}") from e
 
     # Configure displacement settings
-    disp.texture_coords = 'UV'
+    disp.texture_coords = "UV"
     disp.strength = 1.0
     disp.mid_level = 0.5
+
+
 # ------------------------------------------------------------
 # Base Material Setup
 # ------------------------------------------------------------
+
 
 def _create_base_material():
     """
@@ -383,6 +385,7 @@ def _create_base_material():
 # Diffuse
 # ------------------------------------------------------------
 
+
 def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
     """
     Connect diffuse texture to Principled Base Color.
@@ -402,6 +405,7 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
 # ------------------------------------------------------------
 # Roughness + Mask Blend
 # ------------------------------------------------------------
+
 
 def _add_roughness(nodes, links, bsdf, mapping, textures):
     """
@@ -443,6 +447,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
 # ------------------------------------------------------------
 # Normal
 # ------------------------------------------------------------
+
 
 def _add_normal(nodes, links, bsdf, mapping, normal_path):
     """

@@ -18,14 +18,14 @@ def _draw_planetopbr_extension_ui(layout, context):
         return
 
     box = layout.box()
-    box.label(text="PlaneToPBR Profile", icon='USER')
+    box.label(text="PlaneToPBR Profile", icon="USER")
 
     if prefs.platform_login_in_progress:
-        box.label(text="Login through browser", icon='INFO')
+        box.label(text="Login through browser", icon="INFO")
         box.label(text="in progress.")
         actions = box.row(align=True)
-        actions.operator("planetopbr.platform_open_browser", text="Open Browser", icon='URL')
-        actions.operator("planetopbr.platform_cancel_login", text="Cancel", icon='X')
+        actions.operator("planetopbr.platform_open_browser", text="Open Browser", icon="URL")
+        actions.operator("planetopbr.platform_cancel_login", text="Cancel", icon="X")
         return
 
     if prefs.platform_logged_in and prefs.platform_access_token:
@@ -34,13 +34,15 @@ def _draw_planetopbr_extension_ui(layout, context):
         box.label(text=f"My plan: {prefs.platform_plan_label or 'Free plan'}")
         box.label(text=f"Remaining: {prefs.platform_balance_tokens} tokens")
         box.separator()
-        box.operator("wm.url_open", text="Buy Tokens", icon='URL').url = f"{PUBLIC_BASE_URL}/buy"
-        box.operator("wm.url_open", text="See My Account", icon='URL').url = f"{PUBLIC_BASE_URL}/account"
-        box.operator("planetopbr.platform_logout", text="Logout", icon='X')
+        box.operator("wm.url_open", text="Buy Tokens", icon="URL").url = f"{PUBLIC_BASE_URL}/buy"
+        box.operator(
+            "wm.url_open", text="See My Account", icon="URL"
+        ).url = f"{PUBLIC_BASE_URL}/account"
+        box.operator("planetopbr.platform_logout", text="Logout", icon="X")
         return
 
-    box.operator("planetopbr.platform_login", text="Login", icon='URL')
-    box.operator("planetopbr.platform_signup", text="Sign up", icon='URL')
+    box.operator("planetopbr.platform_login", text="Login", icon="URL")
+    box.operator("planetopbr.platform_signup", text="Sign up", icon="URL")
     box.label(text="Sign up to use PlaneToPBR Pro.")
     box.label(text="Hugging Face generation remains free.")
 
@@ -81,7 +83,7 @@ def extension_draw_item_override(
     exui.extension_draw_item_original(layout, **kwargs)
 
     if pkg_id == TARGET_PKG_ID and show:
-        layout.separator(type='LINE')
+        layout.separator(type="LINE")
         _draw_planetopbr_extension_ui(layout, bpy.context)
 
     return True

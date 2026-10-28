@@ -28,7 +28,6 @@ from scripts.platform_client import (
 
 
 class TestPlatformClient(unittest.TestCase):
-
     # ------------------------------------------------------------
     # Initialization Tests
     # ------------------------------------------------------------
@@ -44,10 +43,7 @@ class TestPlatformClient(unittest.TestCase):
 
     def test_init_custom_values(self):
         """Test client initializes with custom values."""
-        client = PlatformClient(
-            base_url="https://custom.api.com/v2",
-            timeout=120
-        )
+        client = PlatformClient(base_url="https://custom.api.com/v2", timeout=120)
 
         self.assertEqual(client.base_url, "https://custom.api.com/v2")
         self.assertEqual(client.timeout, 120)
@@ -65,10 +61,9 @@ class TestPlatformClient(unittest.TestCase):
     def test_login_success(self, mock_urlopen):
         """Test successful login stores tokens."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "access_token": "access_123",
-            "refresh_token": "refresh_456"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {"access_token": "access_123", "refresh_token": "refresh_456"}
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -82,9 +77,9 @@ class TestPlatformClient(unittest.TestCase):
     def test_login_missing_access_token(self, mock_urlopen):
         """Test login raises error when access_token missing."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "refresh_token": "refresh_456"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps({"refresh_token": "refresh_456"}).encode(
+            "utf-8"
+        )
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -98,6 +93,7 @@ class TestPlatformClient(unittest.TestCase):
     def test_login_network_error(self, mock_urlopen):
         """Test login handles network errors."""
         from urllib.error import URLError
+
         mock_urlopen.side_effect = URLError("Network error")
 
         client = PlatformClient()
@@ -113,10 +109,9 @@ class TestPlatformClient(unittest.TestCase):
     def test_get_me_success(self, mock_urlopen):
         """Test get_me returns user info."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "id": "user_123",
-            "email": "user@example.com"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {"id": "user_123", "email": "user@example.com"}
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -144,10 +139,12 @@ class TestPlatformClient(unittest.TestCase):
     def test_refresh_access_token_success(self, mock_urlopen):
         """Test refresh token updates access token."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "access_token": "new_access_789",
-            "refresh_token": "refresh_999",
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {
+                "access_token": "new_access_789",
+                "refresh_token": "refresh_999",
+            }
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -172,7 +169,9 @@ class TestPlatformClient(unittest.TestCase):
     def test_refresh_access_token_missing_access_token(self, mock_urlopen):
         """Test refresh raises error when response missing access_token."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({"refresh_token": "refresh_999"}).encode("utf-8")
+        mock_response.read.return_value = json.dumps({"refresh_token": "refresh_999"}).encode(
+            "utf-8"
+        )
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -191,9 +190,7 @@ class TestPlatformClient(unittest.TestCase):
     def test_get_balance_success(self, mock_urlopen):
         """Test get_balance returns balance info."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "balance_tokens": 1000
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps({"balance_tokens": 1000}).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -213,10 +210,9 @@ class TestPlatformClient(unittest.TestCase):
     def test_create_pbr_job_success(self, mock_urlopen, mock_exists, mock_file):
         """Test create_pbr_job sends correct payload."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "job_id": "job_123",
-            "status": "pending"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {"job_id": "job_123", "status": "pending"}
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -227,7 +223,7 @@ class TestPlatformClient(unittest.TestCase):
             prompt="brick wall",
             output_format="png",
             return_mask=True,
-            client_request_id="req_123"
+            client_request_id="req_123",
         )
 
         self.assertEqual(result["job_id"], "job_123")
@@ -235,13 +231,19 @@ class TestPlatformClient(unittest.TestCase):
         request = mock_urlopen.call_args.args[0]
         payload = json.loads(request.data)
         self.assertEqual(request.get_header("Authorization"), "Bearer access_123")
-        self.assertEqual(payload, {
-            "input_image": {"filename": "image.png", "content_type": "image/png",
-                            "data_base64": base64.b64encode(b"fake_image_data").decode("ascii")},
-            "prompt": "brick wall",
-            "options": {"return_mask": True, "output_format": "png"},
-            "client_request_id": "req_123",
-        })
+        self.assertEqual(
+            payload,
+            {
+                "input_image": {
+                    "filename": "image.png",
+                    "content_type": "image/png",
+                    "data_base64": base64.b64encode(b"fake_image_data").decode("ascii"),
+                },
+                "prompt": "brick wall",
+                "options": {"return_mask": True, "output_format": "png"},
+                "client_request_id": "req_123",
+            },
+        )
 
     def test_create_pbr_job_file_not_found(self):
         """Test create_pbr_job raises error for missing file."""
@@ -259,9 +261,7 @@ class TestPlatformClient(unittest.TestCase):
     def test_create_pbr_job_default_prompt(self, mock_urlopen, mock_exists, mock_file):
         """Test create_pbr_job handles empty prompt."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "job_id": "job_123"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps({"job_id": "job_123"}).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -279,11 +279,13 @@ class TestPlatformClient(unittest.TestCase):
     def test_get_job_status_success(self, mock_urlopen):
         """Test get_job_status returns job status."""
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "job_id": "job_123",
-            "status": "completed",
-            "download_url": "https://example.com/result.zip"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {
+                "job_id": "job_123",
+                "status": "completed",
+                "download_url": "https://example.com/result.zip",
+            }
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient()
@@ -309,10 +311,7 @@ class TestPlatformClient(unittest.TestCase):
 
         client = PlatformClient()
 
-        result = client.download_results(
-            "https://example.com/result.zip",
-            "/output/result.zip"
-        )
+        result = client.download_results("https://example.com/result.zip", "/output/result.zip")
 
         self.assertEqual(result, "/output/result.zip")
         mock_file().write.assert_called_once_with(b"zip_file_data")
@@ -323,20 +322,13 @@ class TestPlatformClient(unittest.TestCase):
         from urllib.error import HTTPError
 
         mock_urlopen.side_effect = HTTPError(
-            url="https://example.com/result.zip",
-            code=404,
-            msg="Not Found",
-            hdrs={},
-            fp=None
+            url="https://example.com/result.zip", code=404, msg="Not Found", hdrs={}, fp=None
         )
 
         client = PlatformClient()
 
         with self.assertRaises(PlatformHTTPError) as ctx:
-            client.download_results(
-                "https://example.com/result.zip",
-                "/output/result.zip"
-            )
+            client.download_results("https://example.com/result.zip", "/output/result.zip")
 
         self.assertIn("DOWNLOAD_FAILED", str(ctx.exception))
 
@@ -348,10 +340,7 @@ class TestPlatformClient(unittest.TestCase):
         client = PlatformClient()
 
         with self.assertRaises(PlatformClientError) as ctx:
-            client.download_results(
-                "https://example.com/result.zip",
-                "/output/result.zip"
-            )
+            client.download_results("https://example.com/result.zip", "/output/result.zip")
 
         self.assertIn("timed out", str(ctx.exception))
 
@@ -366,35 +355,33 @@ class TestPlatformClient(unittest.TestCase):
 
         # First call: 401 error
         http_error = HTTPError(
-            url="https://api.example.com/auth/me",
-            code=401,
-            msg="Unauthorized",
-            hdrs={},
-            fp=None
+            url="https://api.example.com/auth/me", code=401, msg="Unauthorized", hdrs={}, fp=None
         )
-        http_error.read = MagicMock(return_value=json.dumps({
-            "error": {"code": "UNAUTHORIZED", "message": "Token expired"}
-        }).encode("utf-8"))
+        http_error.read = MagicMock(
+            return_value=json.dumps(
+                {"error": {"code": "UNAUTHORIZED", "message": "Token expired"}}
+            ).encode("utf-8")
+        )
 
         # Second call (refresh): success
         refresh_response = MagicMock()
-        refresh_response.read.return_value = json.dumps({
-            "access_token": "new_access_789",
-            "refresh_token": "refresh_999",
-        }).encode("utf-8")
-        refresh_response.decode.return_value = json.dumps({
-            "access_token": "new_access_789",
-            "refresh_token": "refresh_999",
-        })
+        refresh_response.read.return_value = json.dumps(
+            {
+                "access_token": "new_access_789",
+                "refresh_token": "refresh_999",
+            }
+        ).encode("utf-8")
+        refresh_response.decode.return_value = json.dumps(
+            {
+                "access_token": "new_access_789",
+                "refresh_token": "refresh_999",
+            }
+        )
 
         # Third call (retry): success
         retry_response = MagicMock()
-        retry_response.read.return_value = json.dumps({
-            "id": "user_123"
-        }).encode("utf-8")
-        retry_response.decode.return_value = json.dumps({
-            "id": "user_123"
-        })
+        retry_response.read.return_value = json.dumps({"id": "user_123"}).encode("utf-8")
+        retry_response.decode.return_value = json.dumps({"id": "user_123"})
 
         # Setup context manager returns
         refresh_ctx = MagicMock()
@@ -405,11 +392,7 @@ class TestPlatformClient(unittest.TestCase):
         retry_ctx.__enter__ = MagicMock(return_value=retry_response)
         retry_ctx.__exit__ = MagicMock(return_value=False)
 
-        mock_urlopen.side_effect = [
-            http_error,
-            refresh_ctx,
-            retry_ctx
-        ]
+        mock_urlopen.side_effect = [http_error, refresh_ctx, retry_ctx]
 
         client = PlatformClient()
         client.access_token = "old_access_123"
@@ -424,11 +407,13 @@ class TestPlatformClient(unittest.TestCase):
     @patch("scripts.platform_client.urllib.request.urlopen")
     def test_start_browser_login_success(self, mock_urlopen):
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "session_id": "session_123",
-            "authorize_url": "/login?bridge_session=session_123",
-            "expires_in_seconds": 600,
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {
+                "session_id": "session_123",
+                "authorize_url": "/login?bridge_session=session_123",
+                "expires_in_seconds": 600,
+            }
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = PlatformClient(base_url="https://api.example.com/v1")
@@ -449,19 +434,19 @@ class TestPlatformClient(unittest.TestCase):
         from urllib.error import HTTPError
 
         http_error = HTTPError(
-            url="https://api.example.com/test",
-            code=400,
-            msg="Bad Request",
-            hdrs={},
-            fp=None
+            url="https://api.example.com/test", code=400, msg="Bad Request", hdrs={}, fp=None
         )
-        http_error.read = MagicMock(return_value=json.dumps({
-            "error": {
-                "code": "INVALID_INPUT",
-                "message": "Invalid parameter",
-                "request_id": "req_123"
-            }
-        }).encode("utf-8"))
+        http_error.read = MagicMock(
+            return_value=json.dumps(
+                {
+                    "error": {
+                        "code": "INVALID_INPUT",
+                        "message": "Invalid parameter",
+                        "request_id": "req_123",
+                    }
+                }
+            ).encode("utf-8")
+        )
 
         result = _parse_error_response(http_error)
 
@@ -478,7 +463,7 @@ class TestPlatformClient(unittest.TestCase):
             code=500,
             msg="Internal Server Error",
             hdrs={},
-            fp=None
+            fp=None,
         )
         http_error.read = MagicMock(return_value=b"")
 
@@ -493,11 +478,7 @@ class TestPlatformClient(unittest.TestCase):
         from urllib.error import HTTPError
 
         http_error = HTTPError(
-            url="https://api.example.com/test",
-            code=500,
-            msg="Server Error",
-            hdrs={},
-            fp=None
+            url="https://api.example.com/test", code=500, msg="Server Error", hdrs={}, fp=None
         )
         http_error.read = MagicMock(return_value=b"Not JSON")
 
@@ -546,10 +527,7 @@ class TestPlatformClient(unittest.TestCase):
     def test_platform_http_error_attributes(self):
         """Test PlatformHTTPError stores all attributes."""
         error = PlatformHTTPError(
-            status_code=404,
-            code="NOT_FOUND",
-            message="Resource not found",
-            request_id="req_123"
+            status_code=404, code="NOT_FOUND", message="Resource not found", request_id="req_123"
         )
 
         self.assertEqual(error.status_code, 404)
@@ -588,8 +566,10 @@ class TestPlatformClientRegression(unittest.TestCase):
     @patch("scripts.platform_client.urllib.request.urlopen")
     def test_interrupted_reads_are_client_errors(self, urlopen):
         client = PlatformClient()
-        for action in (lambda: client.login("test@example.com", "password"),
-                       lambda: client.download_results("/results.zip", "/unused.zip")):
+        for action in (
+            lambda: client.login("test@example.com", "password"),
+            lambda: client.download_results("/results.zip", "/unused.zip"),
+        ):
             response = self._response(b"")
             response.__enter__.return_value.read.side_effect = IncompleteRead(b"partial", 20)
             urlopen.return_value = response
@@ -599,25 +579,31 @@ class TestPlatformClientRegression(unittest.TestCase):
 
     def test_absolute_signup_url_preserves_query_and_fragment(self):
         client = PlatformClient()
-        with patch.object(client, "_request_json", return_value={
-            "authorize_url": "https://example.com/login?session=123&mode=login#form"
-        }):
+        with patch.object(
+            client,
+            "_request_json",
+            return_value={"authorize_url": "https://example.com/login?session=123&mode=login#form"},
+        ):
             result = client.start_browser_login(mode="register")
-        self.assertEqual(result["authorize_url"],
-                         "https://example.com/login?session=123&mode=register#form")
+        self.assertEqual(
+            result["authorize_url"], "https://example.com/login?session=123&mode=register#form"
+        )
 
     @patch("scripts.platform_client.urllib.request.urlopen")
     def test_browser_status_and_cancel_are_public(self, urlopen):
-        urlopen.return_value = self._response(b'{}')
+        urlopen.return_value = self._response(b"{}")
         client = PlatformClient(base_url="https://example.com/v1")
         client.access_token = "private-token"
         client.get_browser_login_status("session_123")
         client.cancel_browser_login("session_123")
         requests = [call.args[0] for call in urlopen.call_args_list]
-        self.assertEqual([request.full_url for request in requests], [
-            "https://example.com/v1/auth/browser/status/session_123",
-            "https://example.com/v1/auth/browser/cancel/session_123",
-        ])
+        self.assertEqual(
+            [request.full_url for request in requests],
+            [
+                "https://example.com/v1/auth/browser/status/session_123",
+                "https://example.com/v1/auth/browser/cancel/session_123",
+            ],
+        )
         self.assertEqual([request.get_method() for request in requests], ["GET", "POST"])
         self.assertTrue(all(request.get_header("Authorization") is None for request in requests))
 
@@ -628,10 +614,14 @@ class TestPlatformClientRegression(unittest.TestCase):
         client.access_token = "private-token"
         client.refresh_token = "private-refresh-token"
         with tempfile.TemporaryDirectory() as root:
-            for url, expected in (("/results.zip", "https://example.com/results.zip"),
-                                  ("results.zip", "https://example.com/v1/results.zip"),
-                                  ("https://cdn.example.com/results.zip?signature=abc",
-                                   "https://cdn.example.com/results.zip?signature=abc")):
+            for url, expected in (
+                ("/results.zip", "https://example.com/results.zip"),
+                ("results.zip", "https://example.com/v1/results.zip"),
+                (
+                    "https://cdn.example.com/results.zip?signature=abc",
+                    "https://cdn.example.com/results.zip?signature=abc",
+                ),
+            ):
                 with self.subTest(url=url):
                     destination = os.path.join(root, "nested", "result.zip")
                     self.assertEqual(client.download_results(url, destination), destination)
@@ -656,8 +646,10 @@ class TestPlatformClientRegression(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             with self.assertRaises(PlatformClientError):
                 PlatformClient().create_pbr_job(root)
-        with patch("scripts.platform_client.os.path.exists", return_value=True), \
-             patch("builtins.open", side_effect=PermissionError("denied")):
+        with (
+            patch("scripts.platform_client.os.path.exists", return_value=True),
+            patch("builtins.open", side_effect=PermissionError("denied")),
+        ):
             with self.assertRaises(PlatformClientError):
                 PlatformClient().create_pbr_job("image.png")
 
@@ -691,7 +683,9 @@ class TestPlatformClientRegression(unittest.TestCase):
             with self.assertRaises(PlatformClientError) as caught:
                 PlatformClient().extract_results(archive, destination)
             self.assertIsInstance(caught.exception.__cause__, zipfile.BadZipFile)
-            with patch("scripts.platform_client.os.makedirs", side_effect=PermissionError("denied")):
+            with patch(
+                "scripts.platform_client.os.makedirs", side_effect=PermissionError("denied")
+            ):
                 with self.assertRaises(PlatformClientError):
                     PlatformClient().extract_results(archive, destination)
 

@@ -68,8 +68,11 @@ class PlatformClient:
             if not isinstance(authorize_url, str):
                 raise PlatformClientError("Browser login response has an invalid authorize_url.")
             parts = urlsplit(urljoin(self._public_base_url() + "/", authorize_url))
-            query = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True)
-                     if key != "mode"]
+            query = [
+                (key, value)
+                for key, value in parse_qsl(parts.query, keep_blank_values=True)
+                if key != "mode"
+            ]
             query.append(("mode", mode))
             response["authorize_url"] = urlunsplit(parts._replace(query=urlencode(query)))
         return response
@@ -166,7 +169,9 @@ class PlatformClient:
             with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                 data = resp.read()
         except urllib.error.HTTPError as e:
-            raise PlatformHTTPError(e.code, "DOWNLOAD_FAILED", f"Failed to download results: {e.reason}") from e
+            raise PlatformHTTPError(
+                e.code, "DOWNLOAD_FAILED", f"Failed to download results: {e.reason}"
+            ) from e
         except urllib.error.URLError as e:
             raise PlatformClientError(f"Network error downloading results: {e.reason}") from e
         except TimeoutError as e:
@@ -179,7 +184,9 @@ class PlatformClient:
             with open(output_zip_path, "wb") as outfile:
                 outfile.write(data)
         except OSError as exc:
-            raise PlatformClientError(f"Unable to save results to {output_zip_path}: {exc}") from exc
+            raise PlatformClientError(
+                f"Unable to save results to {output_zip_path}: {exc}"
+            ) from exc
 
         return output_zip_path
 

@@ -79,6 +79,7 @@ def test_apply_pbr_textures_calls_expected_helpers(monkeypatch):
     assert called["roughness"] is True
     assert called["normal"] is True
 
+
 def test_apply_pbr_textures_skips_missing_channels(monkeypatch):
     fake_mat = object()
     fake_nodes = object()
@@ -92,15 +93,28 @@ def test_apply_pbr_textures_skips_missing_channels(monkeypatch):
         lambda: (fake_mat, fake_nodes, fake_links, fake_bsdf, fake_mapping),
     )
 
-    monkeypatch.setattr(utils, "_add_diffuse", lambda *a, **k: (_ for _ in ()).throw(Exception("Should not be called")))
-    monkeypatch.setattr(utils, "_add_roughness", lambda *a, **k: (_ for _ in ()).throw(Exception("Should not be called")))
-    monkeypatch.setattr(utils, "_add_normal", lambda *a, **k: (_ for _ in ()).throw(Exception("Should not be called")))
+    monkeypatch.setattr(
+        utils,
+        "_add_diffuse",
+        lambda *a, **k: (_ for _ in ()).throw(Exception("Should not be called")),
+    )
+    monkeypatch.setattr(
+        utils,
+        "_add_roughness",
+        lambda *a, **k: (_ for _ in ()).throw(Exception("Should not be called")),
+    )
+    monkeypatch.setattr(
+        utils,
+        "_add_normal",
+        lambda *a, **k: (_ for _ in ()).throw(Exception("Should not be called")),
+    )
 
     textures = {}  # no channels
 
     result = utils.apply_pbr_textures(None, textures)
 
     assert result is fake_mat
+
 
 def test_import_plane_invalid_payload(monkeypatch):
     from scripts import utils
@@ -111,11 +125,13 @@ def test_import_plane_invalid_payload(monkeypatch):
     with pytest.raises(RuntimeError, match="Invalid textures payload"):
         utils.import_plane_from_image([])
 
+
 def test_import_plane_missing_diffuse(monkeypatch):
     from scripts import utils
 
     with pytest.raises(RuntimeError, match="Diffuse texture missing"):
         utils.import_plane_from_image({})
+
 
 def test_import_plane_image_load_failure(monkeypatch):
     from scripts import utils
@@ -124,12 +140,18 @@ def test_import_plane_image_load_failure(monkeypatch):
         def load(self, path):
             raise Exception("load failed")
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False, )
+    monkeypatch.setattr(
+        utils.bpy,
+        "data",
+        types.SimpleNamespace(images=FakeImages()),
+        raising=False,
+    )
 
     textures = {"diffuse": "fake.png"}
 
     with pytest.raises(RuntimeError, match="Failed to load diffuse image"):
         utils.import_plane_from_image(textures)
+
 
 def test_import_plane_zero_height(monkeypatch):
     from scripts import utils
@@ -141,12 +163,18 @@ def test_import_plane_zero_height(monkeypatch):
         def load(self, path):
             return FakeImage()
 
-    monkeypatch.setattr(utils.bpy,"data",types.SimpleNamespace(images=FakeImages()),raising=False,)
+    monkeypatch.setattr(
+        utils.bpy,
+        "data",
+        types.SimpleNamespace(images=FakeImages()),
+        raising=False,
+    )
 
     textures = {"diffuse": "fake.png"}
 
     with pytest.raises(RuntimeError, match="Invalid image dimensions"):
         utils.import_plane_from_image(textures)
+
 
 def test_import_plane_success_minimal(monkeypatch):
     class FakeImage:
@@ -175,9 +203,16 @@ def test_import_plane_success_minimal(monkeypatch):
             def shade_smooth():
                 pass
 
-    monkeypatch.setattr(utils.bpy,"data",types.SimpleNamespace(images=FakeImages()),raising=False,)
+    monkeypatch.setattr(
+        utils.bpy,
+        "data",
+        types.SimpleNamespace(images=FakeImages()),
+        raising=False,
+    )
     monkeypatch.setattr(utils.bpy, "ops", FakeOps, raising=False)
-    monkeypatch.setattr(utils.bpy, "context", types.SimpleNamespace(active_object=fake_plane), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "context", types.SimpleNamespace(active_object=fake_plane), raising=False
+    )
 
     monkeypatch.setattr(utils, "apply_pbr_textures", lambda *a, **k: object())
     monkeypatch.setattr(utils, "add_modifiers", lambda *a, **k: None)
@@ -188,6 +223,7 @@ def test_import_plane_success_minimal(monkeypatch):
 
     assert fake_plane.name == "PBR_Plane"
 
+
 def test_get_project_texture_dir_no_file(monkeypatch):
     """Test that get_project_texture_dir raises error when project not saved."""
     monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(filepath=""), raising=False)
@@ -195,13 +231,18 @@ def test_get_project_texture_dir_no_file(monkeypatch):
     with pytest.raises(RuntimeError, match="Please save the Blender project"):
         utils.get_project_texture_dir()
 
+
 def test_get_project_texture_dir_success(monkeypatch, tmp_path):
     """Test that get_project_texture_dir creates and returns correct path."""
     project_dir = str(tmp_path / "project")
     os.makedirs(project_dir, exist_ok=True)
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(filepath="/fake/file.blend"), raising=False)
-    monkeypatch.setattr(utils.bpy, "path", types.SimpleNamespace(abspath=lambda x: project_dir), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(filepath="/fake/file.blend"), raising=False
+    )
+    monkeypatch.setattr(
+        utils.bpy, "path", types.SimpleNamespace(abspath=lambda x: project_dir), raising=False
+    )
 
     result = utils.get_project_texture_dir()
 
@@ -209,8 +250,10 @@ def test_get_project_texture_dir_success(monkeypatch, tmp_path):
     assert result == expected
     assert os.path.exists(expected)
 
+
 def test_import_plane_create_failure(monkeypatch):
     """Test that import_plane_from_image handles plane creation failure."""
+
     class FakeImage:
         size = (1024, 1024)
 
@@ -224,7 +267,9 @@ def test_import_plane_create_failure(monkeypatch):
             def primitive_plane_add(**kwargs):
                 raise Exception("Failed to create plane")
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False
+    )
     monkeypatch.setattr(utils.bpy, "ops", FakeOps, raising=False)
 
     textures = {"diffuse": "fake.png"}
@@ -232,8 +277,10 @@ def test_import_plane_create_failure(monkeypatch):
     with pytest.raises(RuntimeError, match="Failed to create plane"):
         utils.import_plane_from_image(textures)
 
+
 def test_import_plane_material_assignment_failure(monkeypatch):
     """Test that import_plane_from_image handles material assignment failure."""
+
     class FakeImage:
         size = (1024, 1024)
 
@@ -264,9 +311,13 @@ def test_import_plane_material_assignment_failure(monkeypatch):
             def shade_smooth():
                 pass
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False
+    )
     monkeypatch.setattr(utils.bpy, "ops", FakeOps, raising=False)
-    monkeypatch.setattr(utils.bpy, "context", types.SimpleNamespace(active_object=fake_plane), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "context", types.SimpleNamespace(active_object=fake_plane), raising=False
+    )
 
     monkeypatch.setattr(utils, "apply_pbr_textures", lambda *a, **k: object())
     monkeypatch.setattr(utils, "add_modifiers", lambda *a, **k: None)
@@ -275,6 +326,7 @@ def test_import_plane_material_assignment_failure(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to assign material"):
         utils.import_plane_from_image(textures)
+
 
 def test_add_modifiers_success(monkeypatch):
     """Test that add_modifiers adds subdivision and displacement modifiers."""
@@ -314,14 +366,16 @@ def test_add_modifiers_success(monkeypatch):
     utils.add_modifiers(plane, textures)
 
     assert len(modifiers_added) == 3
-    assert modifiers_added[0].subdivision_type == 'SIMPLE'
+    assert modifiers_added[0].subdivision_type == "SIMPLE"
     assert modifiers_added[0].levels == 6
     assert modifiers_added[1].levels == 1
-    assert modifiers_added[2].texture_coords == 'UV'
+    assert modifiers_added[2].texture_coords == "UV"
     assert modifiers_added[2].strength == 1.0
+
 
 def test_add_modifiers_failure(monkeypatch):
     """Test that add_modifiers handles modifier creation failure."""
+
     class FakeOps:
         class object:
             @staticmethod
@@ -333,8 +387,10 @@ def test_add_modifiers_failure(monkeypatch):
     with pytest.raises(RuntimeError, match="Failed to add modifiers"):
         utils.add_modifiers(object(), {})
 
+
 def test_add_modifiers_with_depth(monkeypatch):
     """Test that add_modifiers loads and applies depth texture."""
+
     class FakeImage:
         colorspace_settings = types.SimpleNamespace(name=None)
 
@@ -374,18 +430,22 @@ def test_add_modifiers_with_depth(monkeypatch):
                 pass
 
     monkeypatch.setattr(utils.bpy, "ops", FakeOps, raising=False)
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(
-        images=FakeImages(),
-        textures=FakeTextures()
-    ), raising=False)
+    monkeypatch.setattr(
+        utils.bpy,
+        "data",
+        types.SimpleNamespace(images=FakeImages(), textures=FakeTextures()),
+        raising=False,
+    )
 
     textures = {"depth": "depth.png"}
     plane = FakePlane()
 
     utils.add_modifiers(plane, textures)
 
+
 def test_add_modifiers_depth_load_failure(monkeypatch):
     """Test that add_modifiers handles depth texture load failure."""
+
     class FakeImages:
         def load(self, path):
             raise Exception("Image load failed")
@@ -415,10 +475,12 @@ def test_add_modifiers_depth_load_failure(monkeypatch):
                 pass
 
     monkeypatch.setattr(utils.bpy, "ops", FakeOps, raising=False)
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(
-        images=FakeImages(),
-        textures=FakeTextures()
-    ), raising=False)
+    monkeypatch.setattr(
+        utils.bpy,
+        "data",
+        types.SimpleNamespace(images=FakeImages(), textures=FakeTextures()),
+        raising=False,
+    )
 
     textures = {"depth": "depth.png"}
     plane = FakePlane()
@@ -426,22 +488,17 @@ def test_add_modifiers_depth_load_failure(monkeypatch):
     with pytest.raises(RuntimeError, match="Failed to load depth texture"):
         utils.add_modifiers(plane, textures)
 
+
 def test_create_base_material_success(monkeypatch):
     """Test that _create_base_material creates proper node setup."""
+
     class FakeNode:
         def __init__(self, node_type):
             self.type = node_type
             self.location = None
             # Provide all outputs/inputs that might be accessed
-            self.outputs = {
-                "BSDF": object(),
-                "UV": object(),
-                "Vector": object()
-            }
-            self.inputs = {
-                "Surface": object(),
-                "Vector": object()
-            }
+            self.outputs = {"BSDF": object(), "UV": object(), "Vector": object()}
+            self.inputs = {"Surface": object(), "Vector": object()}
 
     class FakeNodes:
         def __init__(self):
@@ -475,7 +532,9 @@ def test_create_base_material_success(monkeypatch):
         def new(self, name):
             return FakeMaterial(name)
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(materials=FakeMaterials()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(materials=FakeMaterials()), raising=False
+    )
 
     mat, nodes, links, bsdf, mapping = utils._create_base_material()
 
@@ -484,19 +543,25 @@ def test_create_base_material_success(monkeypatch):
     assert len(fake_nodes.created) == 4  # Output, BSDF, TexCoord, Mapping
     assert len(fake_links.links_created) == 2  # BSDF->Output, TexCoord->Mapping
 
+
 def test_create_base_material_failure(monkeypatch):
     """Test that _create_base_material handles creation failure."""
+
     class FakeMaterials:
         def new(self, name):
             raise Exception("Material creation failed")
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(materials=FakeMaterials()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(materials=FakeMaterials()), raising=False
+    )
 
     with pytest.raises(RuntimeError, match="Failed to create base material"):
         utils._create_base_material()
 
+
 def test_add_diffuse_load_failure(monkeypatch):
     """Test that _add_diffuse handles texture load failure."""
+
     class FakeImages:
         def load(self, path):
             raise Exception("Image load failed")
@@ -512,7 +577,9 @@ def test_add_diffuse_load_failure(monkeypatch):
         def new(self, type):
             return FakeNode()
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False
+    )
 
     nodes = FakeNodes()
     links = types.SimpleNamespace(new=lambda a, b: None)
@@ -521,6 +588,7 @@ def test_add_diffuse_load_failure(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to load diffuse texture node"):
         utils._add_diffuse(nodes, links, bsdf, mapping, "fake.png")
+
 
 def test_add_roughness_roughness_load_failure(monkeypatch):
     """Test that _add_roughness handles roughness texture load failure."""
@@ -537,14 +605,21 @@ def test_add_roughness_roughness_load_failure(monkeypatch):
         def __init__(self):
             self.image = None
             self.location = None
-            self.inputs = {"Vector": object(), "Color1": object(), "Color2": object(), "Fac": object()}
+            self.inputs = {
+                "Vector": object(),
+                "Color1": object(),
+                "Color2": object(),
+                "Fac": object(),
+            }
             self.outputs = {"Color": object()}
 
     class FakeNodes:
         def new(self, type):
             return FakeNode()
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False
+    )
 
     nodes = FakeNodes()
     links = types.SimpleNamespace(new=lambda a, b: None)
@@ -554,6 +629,7 @@ def test_add_roughness_roughness_load_failure(monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to load roughness map"):
         utils._add_roughness(nodes, links, bsdf, mapping, textures)
+
 
 def test_add_roughness_mask_load_failure(monkeypatch):
     """Test that _add_roughness handles mask texture load failure."""
@@ -570,14 +646,21 @@ def test_add_roughness_mask_load_failure(monkeypatch):
         def __init__(self):
             self.image = None
             self.location = None
-            self.inputs = {"Vector": object(), "Color1": object(), "Color2": object(), "Fac": object()}
+            self.inputs = {
+                "Vector": object(),
+                "Color1": object(),
+                "Color2": object(),
+                "Fac": object(),
+            }
             self.outputs = {"Color": object()}
 
     class FakeNodes:
         def new(self, type):
             return FakeNode()
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False
+    )
 
     nodes = FakeNodes()
     links = types.SimpleNamespace(new=lambda a, b: None)
@@ -588,8 +671,10 @@ def test_add_roughness_mask_load_failure(monkeypatch):
     with pytest.raises(RuntimeError, match="Failed to load mask map"):
         utils._add_roughness(nodes, links, bsdf, mapping, textures)
 
+
 def test_add_normal_load_failure(monkeypatch):
     """Test that _add_normal handles normal map load failure."""
+
     class FakeImages:
         def load(self, path):
             raise Exception("Normal map load failed")
@@ -605,7 +690,9 @@ def test_add_normal_load_failure(monkeypatch):
         def new(self, type):
             return FakeNode()
 
-    monkeypatch.setattr(utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False)
+    monkeypatch.setattr(
+        utils.bpy, "data", types.SimpleNamespace(images=FakeImages()), raising=False
+    )
 
     nodes = FakeNodes()
     links = types.SimpleNamespace(new=lambda a, b: None)
@@ -620,6 +707,7 @@ def test_add_normal_load_failure(monkeypatch):
 # call_hf_pbr tests
 # ------------------------------------------------------------
 
+
 @patch("scripts.utils._download_results")
 @patch("scripts.utils._poll_queue")
 @patch("scripts.utils._join_queue")
@@ -628,13 +716,13 @@ def test_add_normal_load_failure(monkeypatch):
 @patch("scripts.utils.os.path.exists", return_value=True)
 @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
 def test_call_hf_pbr_success(
-        mock_file,
-        mock_exists,
-        mock_resolve,
-        mock_upload,
-        mock_join,
-        mock_poll,
-        mock_download,
+    mock_file,
+    mock_exists,
+    mock_resolve,
+    mock_upload,
+    mock_join,
+    mock_poll,
+    mock_download,
 ):
     mock_resolve.return_value = 0
     mock_upload.return_value = "/tmp/uploaded.png"
@@ -671,9 +759,9 @@ def test_call_hf_pbr_success(
 @patch("scripts.utils.os.path.exists", return_value=True)
 @patch("builtins.open", new_callable=mock_open, read_data=b"imagebytes")
 def test_call_hf_pbr_wraps_exception(
-        mock_file,
-        mock_exists,
-        mock_resolve,
+    mock_file,
+    mock_exists,
+    mock_resolve,
 ):
     mock_resolve.side_effect = Exception("boom")
 
@@ -699,17 +787,22 @@ def test_platform_pipeline_refresh_poll_download_extract(tmp_path):
 
     responses = [
         HTTPError("https://example.com/jobs/pbr", 401, "Unauthorized", {}, io.BytesIO(b"{}")),
-        response(json.dumps({"access_token": "new-access", "refresh_token": "new-refresh"}).encode()),
+        response(
+            json.dumps({"access_token": "new-access", "refresh_token": "new-refresh"}).encode()
+        ),
         response(b'{"job_id":"job123"}'),
         response(b'{"status":"pending"}'),
         response(b'{"status":"completed","download_url":"/public/job123.zip"}'),
         response(zip_data.getvalue()),
     ]
     auth_state = {}
-    with patch("scripts.platform_client.urllib.request.urlopen", side_effect=responses) as urlopen, \
-         patch("scripts.utils.time.sleep") as sleep:
-        textures, tokens = utils.call_platform_pbr(str(image), str(tmp_path), "brick",
-                                                   "old-access", "old-refresh", auth_state=auth_state)
+    with (
+        patch("scripts.platform_client.urllib.request.urlopen", side_effect=responses) as urlopen,
+        patch("scripts.utils.time.sleep") as sleep,
+    ):
+        textures, tokens = utils.call_platform_pbr(
+            str(image), str(tmp_path), "brick", "old-access", "old-refresh", auth_state=auth_state
+        )
     assert tokens == auth_state == {"access_token": "new-access", "refresh_token": "new-refresh"}
     assert set(textures) == {"diffuse", "normal", "roughness"}
     with open(textures["diffuse"], "rb") as source:
@@ -725,6 +818,7 @@ def test_platform_pipeline_refresh_poll_download_extract(tmp_path):
 @pytest.mark.parametrize("failure_stage", ["create", "poll", "download", "extract"])
 def test_platform_pipeline_preserves_tokens_on_failure(tmp_path, failure_stage):
     from scripts.platform_client import PlatformClientError
+
     client = MagicMock()
 
     def create(**kwargs):
@@ -734,7 +828,10 @@ def test_platform_pipeline_preserves_tokens_on_failure(tmp_path, failure_stage):
         return {"job_id": "job123"}
 
     client.create_pbr_job.side_effect = create
-    client.get_job_status.return_value = {"status": "completed", "download_url": "/public/results.zip"}
+    client.get_job_status.return_value = {
+        "status": "completed",
+        "download_url": "/public/results.zip",
+    }
     if failure_stage == "poll":
         client.get_job_status.side_effect = PlatformClientError("poll failed")
     elif failure_stage == "download":
@@ -744,17 +841,27 @@ def test_platform_pipeline_preserves_tokens_on_failure(tmp_path, failure_stage):
     auth_state = {}
     with patch("scripts.utils.PlatformClient", return_value=client):
         with pytest.raises(PlatformClientError):
-            utils.call_platform_pbr("input.png", str(tmp_path), "brick",
-                                    "old-access", "old-refresh", auth_state=auth_state)
+            utils.call_platform_pbr(
+                "input.png",
+                str(tmp_path),
+                "brick",
+                "old-access",
+                "old-refresh",
+                auth_state=auth_state,
+            )
     assert auth_state == {"access_token": "rotated-access", "refresh_token": "rotated-refresh"}
 
 
 def test_platform_pipeline_polling_timeout(tmp_path):
     from scripts.platform_client import PlatformClientError
+
     client = MagicMock()
     client.create_pbr_job.return_value = {"job_id": "job123"}
     client.get_job_status.return_value = {"status": "pending"}
-    with patch("scripts.utils.PlatformClient", return_value=client), patch("scripts.utils.time.sleep"):
+    with (
+        patch("scripts.utils.PlatformClient", return_value=client),
+        patch("scripts.utils.time.sleep"),
+    ):
         with pytest.raises(PlatformClientError, match="polling timeout"):
             utils.call_platform_pbr("input.png", str(tmp_path), "brick", "access", "refresh")
     assert client.get_job_status.call_count == 60

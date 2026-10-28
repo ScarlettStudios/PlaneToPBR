@@ -23,16 +23,14 @@ SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 # Gradio Function Resolution
 # ------------------------------------------------------------
 
+
 def _resolve_fn_index(api_name="predict"):
     """
     Fetch Space config and determine which fn_index
     corresponds to the provided api_name.
     """
     try:
-        with urllib.request.urlopen(
-                f"{SPACE_BASE}/config",
-                timeout=REQUEST_TIMEOUT
-        ) as resp:
+        with urllib.request.urlopen(f"{SPACE_BASE}/config", timeout=REQUEST_TIMEOUT) as resp:
             config = json.loads(resp.read().decode())
 
     except urllib.error.HTTPError as e:
@@ -54,9 +52,11 @@ def _resolve_fn_index(api_name="predict"):
 
     raise RuntimeError(f"api_name '{api_name}' not found in Space config.")
 
+
 # ------------------------------------------------------------
 # File Upload
 # ------------------------------------------------------------
+
 
 def _upload_file(image_path, raw_bytes):
     """
@@ -67,10 +67,14 @@ def _upload_file(image_path, raw_bytes):
     filename = os.path.basename(image_path)
 
     body = (
-               f"--{boundary}\r\n"
-               f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'
-               f"Content-Type: image/png\r\n\r\n"
-           ).encode() + raw_bytes + f"\r\n--{boundary}--\r\n".encode()
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'
+            f"Content-Type: image/png\r\n\r\n"
+        ).encode()
+        + raw_bytes
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
 
     upload_req = urllib.request.Request(
         f"{SPACE_BASE}/gradio_api/upload",
@@ -101,6 +105,7 @@ def _upload_file(image_path, raw_bytes):
 # Queue Join
 # ------------------------------------------------------------
 
+
 def _join_queue(payload):
     """
     Submit payload to Gradio queue and return event_id.
@@ -109,7 +114,7 @@ def _join_queue(payload):
         f"{SPACE_BASE}/gradio_api/queue/join",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
-        method="POST"
+        method="POST",
     )
 
     try:
@@ -134,6 +139,7 @@ def _join_queue(payload):
 # ------------------------------------------------------------
 # Queue Polling (SSE Stream)
 # ------------------------------------------------------------
+
 
 def _poll_queue(session_hash):
     """
@@ -180,9 +186,11 @@ def _poll_queue(session_hash):
 
     raise RuntimeError("No output received from Space.")
 
+
 # ------------------------------------------------------------
 # Download Generated Results
 # ------------------------------------------------------------
+
 
 def _download_results(output, textures_dir, timestamp, diffuse_path):
     """
@@ -195,8 +203,12 @@ def _download_results(output, textures_dir, timestamp, diffuse_path):
 
     try:
         depth = _download_file(output[0]["url"], os.path.join(output_dir, f"depth_{timestamp}.png"))
-        normal = _download_file(output[1]["url"], os.path.join(output_dir, f"normal_{timestamp}.png"))
-        roughness = _download_file(output[2]["url"], os.path.join(output_dir, f"roughness_{timestamp}.png"))
+        normal = _download_file(
+            output[1]["url"], os.path.join(output_dir, f"normal_{timestamp}.png")
+        )
+        roughness = _download_file(
+            output[2]["url"], os.path.join(output_dir, f"roughness_{timestamp}.png")
+        )
         mask = _download_file(output[3]["url"], os.path.join(output_dir, f"mask_{timestamp}.png"))
     except KeyError as e:
         raise RuntimeError(f"Missing expected output field: {e}") from e
@@ -215,6 +227,7 @@ def _download_results(output, textures_dir, timestamp, diffuse_path):
 # ------------------------------------------------------------
 # File Downloader Helper
 # ------------------------------------------------------------
+
 
 def _download_file(url, path):
     """

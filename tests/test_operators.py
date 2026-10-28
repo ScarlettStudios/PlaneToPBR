@@ -18,10 +18,13 @@ if REPO_ROOT not in sys.path:
 mock_bpy = types.ModuleType("bpy")
 mock_bpy.types = types.SimpleNamespace(Operator=object)
 mock_bpy.props = types.SimpleNamespace(StringProperty=lambda **kwargs: None)
-mock_bpy.utils = types.SimpleNamespace(register_class=lambda x: None,
-                                       unregister_class=lambda x: None)
+mock_bpy.utils = types.SimpleNamespace(
+    register_class=lambda x: None, unregister_class=lambda x: None
+)
 mock_bpy.context = types.SimpleNamespace(window_manager=types.SimpleNamespace(windows=[]))
-mock_bpy.ops = types.SimpleNamespace(wm=types.SimpleNamespace(url_open=lambda **kwargs: {'FINISHED'}))
+mock_bpy.ops = types.SimpleNamespace(
+    wm=types.SimpleNamespace(url_open=lambda **kwargs: {"FINISHED"})
+)
 
 sys.modules["bpy"] = mock_bpy
 
@@ -36,7 +39,6 @@ from scripts.platform_client import PlatformClientError
 
 
 class TestOperators(unittest.TestCase):
-
     def _mock_context(self, image_path="fake.png"):
         context = MagicMock()
         context.scene.planetopbr_prompt = "brick"
@@ -84,7 +86,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         op.report.assert_called_once()
 
     # --------------------------------------------------
@@ -106,7 +108,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.modal(context, event)
 
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         op.report.assert_called_once()
 
     # --------------------------------------------------
@@ -129,7 +131,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.modal(context, event)
 
-        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(result, {"FINISHED"})
         mock_import.assert_called_once()
         op.report.assert_called_once()
 
@@ -152,7 +154,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.modal(context, event)
 
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         op.report.assert_called_once()
 
     # --------------------------------------------------
@@ -169,10 +171,10 @@ class TestOperators(unittest.TestCase):
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         op.report.assert_called_once()
         args = op.report.call_args[0]
-        self.assertEqual(args[0], {'ERROR'})
+        self.assertEqual(args[0], {"ERROR"})
         self.assertIn("Unexpected error", args[1])
 
     # --------------------------------------------------
@@ -197,10 +199,10 @@ class TestOperators(unittest.TestCase):
 
         result = op.modal(context, event)
 
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         op.report.assert_called_once()
         args = op.report.call_args[0]
-        self.assertEqual(args[0], {'ERROR'})
+        self.assertEqual(args[0], {"ERROR"})
         self.assertIn("Import failed", args[1])
 
     # --------------------------------------------------
@@ -219,7 +221,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.modal(context, event)
 
-        self.assertEqual(result, {'PASS_THROUGH'})
+        self.assertEqual(result, {"PASS_THROUGH"})
 
     # --------------------------------------------------
     # 8️⃣ modal() processing in progress
@@ -238,7 +240,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.modal(context, event)
 
-        self.assertEqual(result, {'PASS_THROUGH'})
+        self.assertEqual(result, {"PASS_THROUGH"})
         context.window_manager.progress_update.assert_called_once()
         # Progress should have incremented
         self.assertEqual(op._progress, 12)
@@ -260,9 +262,7 @@ class TestOperators(unittest.TestCase):
         self.assertIsNone(op._error_message)
         self.assertEqual(op._textures, {"diffuse": "path/to/diffuse.png"})
         mock_call_hf.assert_called_once_with(
-            image_path="fake.png",
-            output_dir="/fake/textures",
-            prompt="brick"
+            image_path="fake.png", output_dir="/fake/textures", prompt="brick"
         )
 
     # --------------------------------------------------
@@ -304,7 +304,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'RUNNING_MODAL'})
+        self.assertEqual(result, {"RUNNING_MODAL"})
         op._thread.join(timeout=2)
         self.assertFalse(op._thread.is_alive())
         op.modal(context, types.SimpleNamespace(type="TIMER"))
@@ -325,7 +325,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(result, {"FINISHED"})
         self.assertEqual(prefs.platform_access_token, "")
         self.assertEqual(prefs.platform_refresh_token, "")
         self.assertEqual(prefs.platform_account_email, "")
@@ -349,7 +349,7 @@ class TestOperators(unittest.TestCase):
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(result, {"FINISHED"})
         self.assertEqual(prefs.platform_browser_session_id, "")
         self.assertFalse(prefs.platform_login_in_progress)
         mock_cancel.assert_called_once_with("session_123")
@@ -368,14 +368,16 @@ class TestOperators(unittest.TestCase):
 
         result = op.execute(context)
 
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         op.report.assert_called_once()
         self.assertIn("login required", op.report.call_args[0][1].lower())
 
     @patch("scripts.operators.call_platform_pbr")
     @patch("scripts.operators.get_project_texture_dir")
     @patch("scripts.operators._fetch_platform_account_state", return_value=None)
-    def test_run_platform_success_uses_saved_tokens(self, mock_account, mock_get_dir, mock_call_platform):
+    def test_run_platform_success_uses_saved_tokens(
+        self, mock_account, mock_get_dir, mock_call_platform
+    ):
         mock_get_dir.return_value = "/fake/textures"
         mock_call_platform.return_value = (
             {"diffuse": "path/to/diffuse.png"},
@@ -418,7 +420,7 @@ class TestOperators(unittest.TestCase):
         with patch("scripts.operators.import_plane_from_image") as mock_import:
             result = op.modal(context, event)
 
-        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(result, {"FINISHED"})
         mock_import.assert_called_once()
         self.assertEqual(prefs.platform_access_token, "new_access")
         self.assertEqual(prefs.platform_refresh_token, "new_refresh")
@@ -439,7 +441,8 @@ class TestOperators(unittest.TestCase):
 
         client = mock_client_cls.return_value
         client.start_browser_login.return_value = {
-            "session_id": "session_123", "authorize_url": "https://example.com/login",
+            "session_id": "session_123",
+            "authorize_url": "https://example.com/login",
         }
         client.get_browser_login_status.return_value = {
             "status": "approved",
@@ -477,10 +480,10 @@ class TestOperators(unittest.TestCase):
             op._thread.join(timeout=2)
             self.assertFalse(op._thread.is_alive())
             result = op.modal(context, event)
-            if result == {'FINISHED'}:
+            if result == {"FINISHED"}:
                 break
 
-        self.assertEqual(result, {'FINISHED'})
+        self.assertEqual(result, {"FINISHED"})
         self.assertEqual(prefs.platform_access_token, "rotated-access")
         self.assertEqual(prefs.platform_refresh_token, "rotated-refresh")
         self.assertEqual(len(account_threads), 2)
@@ -512,10 +515,12 @@ class TestOperators(unittest.TestCase):
         op.mode = "login"
         op.report = MagicMock()
         try:
-            self.assertEqual(op.execute(context), {'RUNNING_MODAL'})
+            self.assertEqual(op.execute(context), {"RUNNING_MODAL"})
             self.assertTrue(entered.wait(timeout=2))
             for _ in range(3):
-                self.assertEqual(op.modal(context, types.SimpleNamespace(type="TIMER")), {'PASS_THROUGH'})
+                self.assertEqual(
+                    op.modal(context, types.SimpleNamespace(type="TIMER")), {"PASS_THROUGH"}
+                )
             self.assertNotEqual(worker_ids[0], threading.get_ident())
             self.assertTrue(prefs.platform_login_in_progress)
             client.start_browser_login.assert_called_once()
@@ -528,7 +533,9 @@ class TestOperators(unittest.TestCase):
 
     @patch("scripts.operators._cancel_browser_session")
     @patch("scripts.operators.PlatformClient")
-    def test_cancel_before_session_response_discards_late_result(self, mock_client_cls, mock_cancel):
+    def test_cancel_before_session_response_discards_late_result(
+        self, mock_client_cls, mock_cancel
+    ):
         context = self._mock_context()
         prefs = self._add_preferences(context)
         release = threading.Event()
@@ -558,12 +565,15 @@ class TestOperators(unittest.TestCase):
 
     @patch("scripts.operators._cancel_browser_session")
     @patch("scripts.operators.PlatformClient")
-    def test_status_poll_runs_in_worker_without_overlapping_requests(self, mock_client_cls, mock_cancel):
+    def test_status_poll_runs_in_worker_without_overlapping_requests(
+        self, mock_client_cls, mock_cancel
+    ):
         context = self._mock_context()
         self._add_preferences(context)
         client = mock_client_cls.return_value
         client.start_browser_login.return_value = {
-            "session_id": "session_123", "authorize_url": "https://example.com/login",
+            "session_id": "session_123",
+            "authorize_url": "https://example.com/login",
         }
         entered, release = threading.Event(), threading.Event()
         worker_ids = []
@@ -585,7 +595,7 @@ class TestOperators(unittest.TestCase):
             op.modal(context, event)
             op.modal(context, event)
             self.assertTrue(entered.wait(timeout=2))
-            self.assertEqual(op.modal(context, event), {'PASS_THROUGH'})
+            self.assertEqual(op.modal(context, event), {"PASS_THROUGH"})
             self.assertNotEqual(worker_ids[0], threading.get_ident())
             client.get_browser_login_status.assert_called_once_with("session_123")
         finally:
@@ -595,12 +605,15 @@ class TestOperators(unittest.TestCase):
 
     @patch("scripts.operators._cancel_browser_session")
     @patch("scripts.operators.PlatformClient")
-    def test_cancel_button_prevents_old_login_overwriting_new_session(self, mock_client_cls, mock_cancel):
+    def test_cancel_button_prevents_old_login_overwriting_new_session(
+        self, mock_client_cls, mock_cancel
+    ):
         context = self._mock_context()
         prefs = self._add_preferences(context)
         client = mock_client_cls.return_value
         client.start_browser_login.return_value = {
-            "session_id": "old-session", "authorize_url": "https://example.com/login",
+            "session_id": "old-session",
+            "authorize_url": "https://example.com/login",
         }
         old = PLANETOPBR_OT_platform_login()
         old.mode = "login"
@@ -609,9 +622,10 @@ class TestOperators(unittest.TestCase):
         old._thread.join(timeout=2)
         cancel = PLANETOPBR_OT_platform_cancel_login()
         cancel.report = MagicMock()
-        self.assertEqual(cancel.execute(context), {'FINISHED'})
+        self.assertEqual(cancel.execute(context), {"FINISHED"})
         client.start_browser_login.return_value = {
-            "session_id": "new-session", "authorize_url": "https://example.com/login",
+            "session_id": "new-session",
+            "authorize_url": "https://example.com/login",
         }
         new = PLANETOPBR_OT_platform_login()
         new.mode = "login"
@@ -620,7 +634,7 @@ class TestOperators(unittest.TestCase):
             new.execute(context)
             new._thread.join(timeout=2)
             event = types.SimpleNamespace(type="TIMER")
-            self.assertEqual(old.modal(context, event), {'CANCELLED'})
+            self.assertEqual(old.modal(context, event), {"CANCELLED"})
             new.modal(context, event)
             self.assertEqual(prefs.platform_browser_session_id, "new-session")
             mock_cancel.assert_called_once_with("old-session")
@@ -631,14 +645,16 @@ class TestOperators(unittest.TestCase):
     def test_login_network_failure_cleans_up_timer(self, mock_client_cls):
         context = self._mock_context()
         prefs = self._add_preferences(context)
-        mock_client_cls.return_value.start_browser_login.side_effect = PlatformClientError("offline")
+        mock_client_cls.return_value.start_browser_login.side_effect = PlatformClientError(
+            "offline"
+        )
         op = PLANETOPBR_OT_platform_login()
         op.mode = "login"
         op.report = MagicMock()
         op.execute(context)
         op._thread.join(timeout=2)
         result = op.modal(context, types.SimpleNamespace(type="TIMER"))
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         self.assertFalse(prefs.platform_login_in_progress)
         context.window_manager.event_timer_remove.assert_called_once_with("timer")
 
@@ -648,21 +664,27 @@ class TestOperators(unittest.TestCase):
         op = OBJECT_OT_import_plane_from_platform()
         op._platform_done = True
         op._error_message = "download failed"
-        op._updated_auth_state = {"access_token": "rotated-access", "refresh_token": "rotated-refresh"}
+        op._updated_auth_state = {
+            "access_token": "rotated-access",
+            "refresh_token": "rotated-refresh",
+        }
         op._timer = "timer"
         op.report = MagicMock()
         with patch("scripts.operators.PlatformClient") as client:
             result = op.modal(context, types.SimpleNamespace(type="TIMER"))
             client.assert_not_called()
-        self.assertEqual(result, {'CANCELLED'})
+        self.assertEqual(result, {"CANCELLED"})
         self.assertEqual(prefs.platform_refresh_token, "rotated-refresh")
 
     @patch("scripts.operators.call_platform_pbr")
     @patch("scripts.operators.get_project_texture_dir", return_value="/fake/textures")
     def test_worker_keeps_rotated_tokens_when_pipeline_raises(self, mock_dir, mock_pipeline):
         def fail(**kwargs):
-            kwargs["auth_state"].update(access_token="rotated-access", refresh_token="rotated-refresh")
+            kwargs["auth_state"].update(
+                access_token="rotated-access", refresh_token="rotated-refresh"
+            )
             raise PlatformClientError("download failed")
+
         mock_pipeline.side_effect = fail
         op = OBJECT_OT_import_plane_from_platform()
         op._run_platform_api("fake.png", "brick", "old-access", "old-refresh")

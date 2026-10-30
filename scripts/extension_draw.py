@@ -1,6 +1,6 @@
 import bpy
 
-from .addon_runtime import get_addon_preferences
+from .addon_runtime import get_addon_preferences, pro_enabled
 from .platform_client import DEFAULT_BASE_URL
 
 TARGET_PKG_ID = "planetopbr"
@@ -90,7 +90,8 @@ def extension_draw_item_override(
 
 
 def register():
-    if exui is None or hasattr(exui, "extension_draw_item_original"):
+    # The profile box exists only for Pro login, so it is hidden with Pro.
+    if not pro_enabled() or exui is None or hasattr(exui, "extension_draw_item_original"):
         return
     exui.extension_draw_item_original = exui.extension_draw_item
     exui.extension_draw_item = extension_draw_item_override

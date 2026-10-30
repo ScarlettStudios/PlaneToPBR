@@ -1,6 +1,6 @@
 import bpy
 
-from .addon_runtime import get_addon_preferences
+from .addon_runtime import get_addon_preferences, pro_enabled
 
 
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
@@ -52,7 +52,10 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
             "object.import_plane_from_image", text="Generate PBR (HuggingFace)", icon="COMMUNITY"
         )
 
-        # Platform API button
+        # Platform API button, hidden until PlaneToPBR Pro launches
+        if not pro_enabled():
+            return
+
         prefs = get_addon_preferences(context)
         pro_row = layout.row()
         pro_available = bool(

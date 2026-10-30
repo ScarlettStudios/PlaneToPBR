@@ -4,7 +4,7 @@ from queue import Empty, Queue
 
 import bpy
 
-from .addon_runtime import get_addon_preferences
+from .addon_runtime import get_addon_preferences, pro_enabled
 from .platform_client import PlatformClient, PlatformClientError
 from .utils import call_hf_pbr, call_platform_pbr, get_project_texture_dir, import_plane_from_image
 
@@ -652,23 +652,32 @@ class OBJECT_OT_import_plane_from_platform(bpy.types.Operator):
 # ------------------------------------------------------------
 
 
+PRO_CLASSES = (
+    PLANETOPBR_OT_platform_login,
+    PLANETOPBR_OT_platform_signup,
+    PLANETOPBR_OT_platform_cancel_login,
+    PLANETOPBR_OT_platform_open_browser,
+    PLANETOPBR_OT_platform_logout,
+    OBJECT_OT_import_plane_from_platform,
+)
+
+# Classes this session registered, so unregister mirrors register even if the
+# Pro flag changes in between.
+_registered_classes = []
+
+
 def register():
-    """Register the operators with Blender."""
-    bpy.utils.register_class(PLANETOPBR_OT_platform_login)
-    bpy.utils.register_class(PLANETOPBR_OT_platform_signup)
-    bpy.utils.register_class(PLANETOPBR_OT_platform_cancel_login)
-    bpy.utils.register_class(PLANETOPBR_OT_platform_open_browser)
-    bpy.utils.register_class(PLANETOPBR_OT_platform_logout)
-    bpy.utils.register_class(OBJECT_OT_import_plane_from_image)
-    bpy.utils.register_class(OBJECT_OT_import_plane_from_platform)
+    """Register the operators with Blender; Pro operators only when Pro is enabled."""
+    classes = [OBJECT_OT_import_plane_from_image]
+    if pro_enabled():
+        classes.extend(PRO_CLASSES)
+
+    for cls in classes:
+        bpy.utils.register_class(cls)
+        _registered_classes.append(cls)
 
 
 def unregister():
     """Unregister the operators from Blender."""
-    bpy.utils.unregister_class(OBJECT_OT_import_plane_from_platform)
-    bpy.utils.unregister_class(OBJECT_OT_import_plane_from_image)
-    bpy.utils.unregister_class(PLANETOPBR_OT_platform_logout)
-    bpy.utils.unregister_class(PLANETOPBR_OT_platform_open_browser)
-    bpy.utils.unregister_class(PLANETOPBR_OT_platform_cancel_login)
-    bpy.utils.unregister_class(PLANETOPBR_OT_platform_signup)
-    bpy.utils.unregister_class(PLANETOPBR_OT_platform_login)
+    while _registered_classes:
+        bpy.utils.unregister_class(_registered_classes.pop())

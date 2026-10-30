@@ -88,22 +88,9 @@ Then choose the image file.
 
 ---
 
-### Step 3 — Optional PlaneToPBR Pro Login
+### Step 3 — Generate PBR Plane
 
-PlaneToPBR Pro / GPU generation is authenticated from the add-on preferences, not from the sidebar panel.
-
-Open **Edit -> Preferences -> Add-ons -> PlaneToPBR** and log in there.
-
-The standard **Hugging Face** generation remains free and does not require login.
-
----
-
-### Step 4 — Generate PBR Plane
-
-Click either:
-
-- **Generate PBR (HuggingFace)** for the free flow
-- **Generate PBR Pro (GPU)** for the authenticated platform flow
+Click **Generate PBR (HuggingFace)**. It is free and does not require login.
 
 ![Generate Button](assets/generate.png)
 

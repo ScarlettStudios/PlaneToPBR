@@ -1,5 +1,5 @@
-# Blender 4.2, the oldest supported release, bundles Python 3.11.
-ARG PYTHON_IMAGE=docker.io/library/python:3.11-slim-bookworm@sha256:94a8fee35252d06ab75856f15f12c7bae67b10e8a6da93c7fded82b2610926cd
+# Blender 5.1, the oldest supported release, bundles Python 3.13.
+ARG PYTHON_IMAGE=docker.io/library/python:3.13-slim-bookworm@sha256:281d39ff02e3b389401586134ff9e6572954687822a58055ec07a60ded4e0b7f
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0
 
 FROM ${UV_IMAGE} AS uv

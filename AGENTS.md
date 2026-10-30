@@ -4,8 +4,8 @@
 
 PlaneToPBR is a Blender add-on (extension) that turns one image into a plane
 with a PBR material. `blender_manifest.toml` declares the extension; its
-`blender_version_min` (4.2) sets the oldest supported Blender and therefore
-Python 3.11. `__init__.py` registers the modules in `scripts/`:
+`blender_version_min` (5.1) sets the oldest supported Blender and therefore
+Python 3.13. `__init__.py` registers the modules in `scripts/`:
 
 - `hf_client.py`: the free flow's stdlib HTTP client for the FacadeMaker
   Inference Space (`SPACE_BASE`).
@@ -25,11 +25,11 @@ Blender's bundled Python. `Containerfile` defines the checks image;
 `.containerignore` restricts the build context to required inputs.
 `.github/workflows/ci.yml` builds the checks stage with Buildah, then packages
 and releases the extension zip. `ruff.toml` defines lint and format rules and
-the Python 3.11 target.
+the Python 3.13 target.
 
 ## Setup and checks
 
-Use Python 3.11 (Blender 4.2's interpreter) in a project virtual environment.
+Use Python 3.13 (Blender 5.1's interpreter) in a project virtual environment.
 Install with `python -m pip install -r requirements-dev.txt`.
 
 Run:

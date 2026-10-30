@@ -1,6 +1,6 @@
-# Hashed development tools for Linux x86_64 / CPython 3.11 (Blender 4.2's Python).
+# Hashed development tools for Linux x86_64 / CPython 3.13 (Blender 5.1's Python).
 # Regenerate from the direct pins with:
-#   uv pip compile <direct pins> --generate-hashes --python-version 3.11 \
+#   uv pip compile <direct pins> --generate-hashes --python-version 3.13 \
 #     --python-platform x86_64-unknown-linux-gnu
 # Direct pins: pytest, ruff.
 

@@ -12,7 +12,7 @@ import uuid
 REQUEST_TIMEOUT = 120
 
 # Base URL for your Hugging Face Space
-SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
+SPACE_BASE = "https://scarlettstudios-facademaker-inference.hf.space"
 
 # ------------------------------------------------------------
 # Public API (low-level helpers exported for use in utils.py)

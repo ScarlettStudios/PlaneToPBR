@@ -1,3 +1,16 @@
+# Editors
 .idea/
+.vscode/
+
+# Python and tooling caches
 __pycache__/
-tests/__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Release builds
+*.zip
+
+# Local test images and generated texture maps
+assets/test_assets/

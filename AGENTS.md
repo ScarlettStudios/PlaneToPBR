@@ -19,36 +19,45 @@ Python 3.13. `__init__.py` registers the modules in `scripts/`:
   listing UI, and package-id lookup.
 
 `tests/` holds pytest tests that stub `bpy`, so they run without Blender.
-`requirements-dev.txt` is the hashed set of development tools (pytest, Ruff).
-The add-on has no pip runtime dependencies; keep it stdlib-only so it runs on
-Blender's bundled Python. `Containerfile` defines the checks image;
+`pyproject.toml` holds the development tooling only: the `dev` dependency
+group (pytest, Ruff) and the pytest and Ruff settings, including the Python
+3.13 target. `uv.lock` pins and hashes those tools. `.python-version` pins
+uv's local interpreter to 3.13, since `requires-python` is only a floor and
+uv would otherwise pick any newer Python; the container ignores it and takes
+3.13 from `PYTHON_IMAGE`. Raise it together with `blender_version_min`,
+`PYTHON_IMAGE`, and Ruff's `target-version`. `blender_manifest.toml`,
+not `pyproject.toml`, defines the add-on for Blender; keep their versions in
+step. The add-on has no pip runtime dependencies; keep it stdlib-only so it
+runs on Blender's bundled Python. `Containerfile` defines the checks image;
 `.containerignore` restricts the build context to required inputs.
-`.github/workflows/ci.yml` builds the checks stage with Buildah, then packages
-and releases the extension zip. `ruff.toml` defines lint and format rules and
-the Python 3.13 target.
+`.github/workflows/ci.yml` builds the checks stage with Buildah from the
+pinned `quay.io/buildah/stable` image, then packages and releases the
+extension zip. `.git-blame-ignore-revs` lists formatting-only commits for
+blame; add a commit there whenever one only reformats code.
 
 ## Setup and checks
 
-Use Python 3.13 (Blender 5.1's interpreter) in a project virtual environment.
-Install with `python -m pip install -r requirements-dev.txt`.
+Use [uv](https://docs.astral.sh/uv/). `.python-version` selects Python 3.13
+(Blender 5.1's interpreter). Install with `uv sync --locked`, which creates
+`.venv`. After changing the `dev` group, run `uv lock` and commit `uv.lock`.
 
 Run:
 
 ```sh
-python -m pip check
-python -m ruff check .
-python -m ruff format --check .
-python -m pytest -v
+uv run --locked ruff check .
+uv run --locked ruff format --check .
+uv run --locked pytest -v
 ```
 
 To run the same checks in a container, as CI does:
 
 ```sh
-buildah bud --format docker --file Containerfile --target checks .
+buildah build --file Containerfile --target checks .
 ```
 
-Pin the base image by digest in `PYTHON_IMAGE`, and keep its Python minor
-version equal to the oldest supported Blender's.
+Pin `PYTHON_IMAGE`, `UV_IMAGE`, and CI's `BUILDAH_IMAGE` by digest, and keep
+the Python image's minor version equal to the oldest supported Blender's.
+Keep `UV_IMAGE` at the uv version used to write `uv.lock`.
 
 ## Change conventions
 

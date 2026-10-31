@@ -3,9 +3,8 @@
 **
 !Containerfile
 !.containerignore
-!requirements-dev.txt
-!ruff.toml
-!pytest.ini
+!pyproject.toml
+!uv.lock
 !__init__.py
 !scripts/
 !scripts/**

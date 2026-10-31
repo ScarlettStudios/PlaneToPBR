@@ -17,9 +17,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Ruff, the format check, and pytest run inside the Containerfile's checks stage.
+      # Ruff, the format check, and pytest run inside the Containerfile's checks
+      # stage, built by Buildah from its pinned quay.io image rather than the
+      # runner's distro package.
       - name: Lint and test with Buildah
-        run: sudo buildah build --file Containerfile --target checks .
+        env:
+          BUILDAH_IMAGE: quay.io/buildah/stable:v1.43.5@sha256:baaa8fe50d0e78687fa39ef90d5afcea07a6bec086dfdef99f792b555f98fbcd
+        run: >-
+          podman run --rm --privileged
+          --volume "$PWD:/src:ro" --workdir /src
+          "$BUILDAH_IMAGE"
+          buildah build --storage-driver vfs --file Containerfile --target checks .
 
   package:
     runs-on: ubuntu-latest

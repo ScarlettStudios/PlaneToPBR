@@ -1,0 +1,41 @@
+# Development tooling only. Blender installs the add-on from
+# blender_manifest.toml, which stays the source of truth for its id, version,
+# and minimum Blender; this file is not part of the release zip.
+[project]
+name = "planetopbr"
+version = "1.0.0"
+description = "Blender add-on that turns one image into a plane with a PBR material"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+# Blender 5.1, the oldest supported release, bundles Python 3.13.
+requires-python = ">=3.13"
+# The add-on runs on Blender's bundled Python; keep it stdlib-only.
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest==9.0.2",
+    "ruff==0.17.1",
+]
+
+[tool.uv]
+# Not an installable package; uv only manages the dev environment.
+package = false
+# Match UV_IMAGE in the Containerfile, so the lock is written and read by the
+# same uv.
+required-version = "==0.13.6"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests adjust sys.path and provide a bpy stub before importing the add-on.
+"tests/*.py" = ["E402"]

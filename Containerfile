@@ -6,27 +6,33 @@ FROM ${UV_IMAGE} AS uv
 
 FROM ${PYTHON_IMAGE} AS base
 
+# Use the image's Python rather than downloading one, and keep the venv
+# outside /app so the source copy cannot shadow it. The uv cache is a build
+# cache mount on another filesystem, so copy from it instead of hard-linking.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never \
+    UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH"
 
 WORKDIR /app
 
 FROM base AS dependencies
 
-# Hash-pinned development tools; the add-on itself needs only Blender's Python.
-# uv runs from a bind mount, so neither it nor pip ends up in the venv.
-COPY requirements-dev.txt ./
+# Locked, hash-verified development tools; the add-on itself needs only
+# Blender's Python. uv runs from a bind mount and caches downloads in a build
+# cache mount, so neither ends up in the image.
+COPY pyproject.toml uv.lock ./
 RUN --mount=from=uv,source=/uv,target=/bin/uv \
-    uv venv --no-cache /opt/venv \
-    && uv pip install --no-cache --python /opt/venv --require-hashes \
-        --only-binary=:all: -r requirements-dev.txt \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --only-dev --no-install-project --no-build \
     && uv pip check --python /opt/venv
 
 # Tests stub bpy, so they run without Blender.
 FROM dependencies AS checks
 
-COPY ruff.toml pytest.ini __init__.py ./
+COPY __init__.py ./
 COPY scripts/ ./scripts/
 COPY tests/ ./tests/
 RUN python -m ruff check --no-cache . \

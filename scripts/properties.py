@@ -1,5 +1,6 @@
 import bpy
 from bpy.props import BoolProperty, IntProperty, StringProperty
+
 from .addon_runtime import BASE_PACKAGE
 
 
@@ -8,22 +9,24 @@ class PLANETOPBR_AddonPreferences(bpy.types.AddonPreferences):
 
     bl_idname = BASE_PACKAGE
 
-    platform_access_token = StringProperty(default="", options={'HIDDEN'})
-    platform_refresh_token = StringProperty(default="", options={'HIDDEN'})
-    platform_account_email = StringProperty(default="", options={'HIDDEN'})
-    platform_plan_label = StringProperty(default="Free plan", options={'HIDDEN'})
-    platform_balance_tokens = IntProperty(default=0, options={'HIDDEN'})
-    platform_logged_in = BoolProperty(default=False, options={'HIDDEN'})
-    platform_login_in_progress = BoolProperty(default=False, options={'HIDDEN'})
-    platform_browser_session_id = StringProperty(default="", options={'HIDDEN'})
-    platform_browser_authorize_url = StringProperty(default="", options={'HIDDEN'})
+    platform_access_token: StringProperty(default="", options={"HIDDEN"})
+    platform_refresh_token: StringProperty(default="", options={"HIDDEN"})
+    platform_account_email: StringProperty(default="", options={"HIDDEN"})
+    platform_plan_label: StringProperty(default="Free plan", options={"HIDDEN"})
+    platform_balance_tokens: IntProperty(default=0, options={"HIDDEN"})
+    platform_logged_in: BoolProperty(default=False, options={"HIDDEN"})
+    platform_login_in_progress: BoolProperty(default=False, options={"HIDDEN"})
+    platform_browser_session_id: StringProperty(default="", options={"HIDDEN"})
+    platform_browser_authorize_url: StringProperty(default="", options={"HIDDEN"})
 
     def draw(self, context):
         pass
 
+
 # ------------------------------------------------------------
 # Scene Property Registration
 # ------------------------------------------------------------
+
 
 def register():
     """
@@ -40,13 +43,11 @@ def register():
     # File path to the source image
     # Uses FILE_PATH subtype so Blender shows a file browser
     bpy.types.Scene.planetopbr_image_path = StringProperty(
-        name="Image",
-        description="Path to source image",
-        default="",
-        subtype='FILE_PATH'
+        name="Image", description="Path to source image", default="", subtype="FILE_PATH"
     )
 
     bpy.utils.register_class(PLANETOPBR_AddonPreferences)
+
 
 def unregister():
     """

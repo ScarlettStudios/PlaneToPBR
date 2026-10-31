@@ -10,28 +10,29 @@ if REPO_ROOT not in sys.path:
 
 import json
 import unittest
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import MagicMock, mock_open, patch
 
 from scripts.hf_client import (
-    _resolve_fn_index,
+    _download_file,
+    _download_results,
     _join_queue,
     _poll_queue,
-    _download_results,
-    _download_file,
+    _resolve_fn_index,
 )
 
 
 class TestHFClient(unittest.TestCase):
-
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_resolve_fn_index_success(self, mock_urlopen):
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "dependencies": [
-                {"api_name": "foo"},
-                {"api_name": "predict"},
-            ]
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {
+                "dependencies": [
+                    {"api_name": "foo"},
+                    {"api_name": "predict"},
+                ]
+            }
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         result = _resolve_fn_index("predict")
@@ -40,9 +41,9 @@ class TestHFClient(unittest.TestCase):
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_resolve_fn_index_not_found(self, mock_urlopen):
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "dependencies": [{"api_name": "foo"}]
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps(
+            {"dependencies": [{"api_name": "foo"}]}
+        ).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         with self.assertRaises(RuntimeError):
@@ -51,9 +52,7 @@ class TestHFClient(unittest.TestCase):
     @patch("scripts.hf_client.urllib.request.urlopen")
     def test_join_queue_success(self, mock_urlopen):
         mock_response = MagicMock()
-        mock_response.read.return_value = json.dumps({
-            "event_id": "evt123"
-        }).encode("utf-8")
+        mock_response.read.return_value = json.dumps({"event_id": "evt123"}).encode("utf-8")
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         payload = {"data": [], "fn_index": 0, "session_hash": "abc"}
@@ -89,12 +88,7 @@ class TestHFClient(unittest.TestCase):
             {"url": "m"},
         ]
 
-        textures = _download_results(
-            output,
-            "/tmp",
-            "123",
-            "/tmp/diffuse_123.png"
-        )
+        textures = _download_results(output, "/tmp", "123", "/tmp/diffuse_123.png")
 
         self.assertEqual(textures["depth"], "/tmp/depth.png")
         self.assertEqual(textures["normal"], "/tmp/normal.png")

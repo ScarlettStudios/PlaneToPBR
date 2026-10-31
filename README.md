@@ -1,6 +1,6 @@
 # PlaneToPBR — One-Click PBR Plane Generator for Blender
 
-![Blender](https://img.shields.io/badge/Blender-4.2%2B-orange)
+![Blender](https://img.shields.io/badge/Blender-5.1%2B-orange)
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![Release](https://img.shields.io/github/v/release/ScarlettStudios/PlaneToPBR)
@@ -22,7 +22,8 @@ The extension automatically generates and applies:
 
 This allows artists to quickly convert reference images into usable **3D textured geometry**.
 
-Compatible with Blender 4.2 and newer.
+Compatible with Blender 5.1 and newer. For Blender 4.2 to 5.0, use the
+[v1.0.2 release](https://github.com/ScarlettStudios/PlaneToPBR/releases/tag/v1.0.2).
 
 ---
 
@@ -88,22 +89,9 @@ Then choose the image file.
 
 ---
 
-### Step 3 — Optional PlaneToPBR Pro Login
+### Step 3 — Generate PBR Plane
 
-PlaneToPBR Pro / GPU generation is authenticated from the add-on preferences, not from the sidebar panel.
-
-Open **Edit -> Preferences -> Add-ons -> PlaneToPBR** and log in there.
-
-The standard **Hugging Face** generation remains free and does not require login.
-
----
-
-### Step 4 — Generate PBR Plane
-
-Click either:
-
-- **Generate PBR (HuggingFace)** for the free flow
-- **Generate PBR Pro (GPU)** for the authenticated platform flow
+Click **Generate PBR (HuggingFace)**. It is free and does not require login.
 
 ![Generate Button](assets/generate.png)
 

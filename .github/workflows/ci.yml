@@ -11,22 +11,19 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-
+  checks:
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Docker image (forced fresh)
-        run: docker build --pull --no-cache -t planetopbr-ci:${{ github.sha }} .
-
-      - name: Run tests
-        run: docker run --rm planetopbr-ci:${{ github.sha }}
+      # Ruff, the format check, and pytest run inside the Containerfile's checks stage.
+      - name: Lint and test with Buildah
+        run: sudo buildah build --file Containerfile --target checks .
 
   package:
     runs-on: ubuntu-latest
-    needs: test
+    needs: checks
 
     steps:
       - name: Checkout repository

@@ -1,0 +1,3 @@
+# Formatting-only commits, skipped by git blame and GitHub blame.
+# style: format the add-on with Ruff
+2581ec17e8d7b665ac050209b6f5032f4c67fbaf

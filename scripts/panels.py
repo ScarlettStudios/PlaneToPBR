@@ -1,15 +1,18 @@
 import bpy
-from .addon_runtime import get_addon_preferences
+
+from .addon_runtime import get_addon_preferences, pro_enabled
+
 
 class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
     """
     UI Panel for the PlaneToPBR add-on.
     """
+
     # Panel display settings
     bl_label = "Plane to PBR"
     bl_idname = "VIEW3D_PT_planetopbr"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
     bl_category = "PlaneToPBR"
 
     def draw(self, context):
@@ -46,37 +49,44 @@ class VIEW3D_PT_planetopbr_panel(bpy.types.Panel):
 
         # HuggingFace button
         layout.operator(
-            "object.import_plane_from_image",
-            text="Generate PBR (HuggingFace)",
-            icon='COMMUNITY'
+            "object.import_plane_from_image", text="Generate PBR (HuggingFace)", icon="COMMUNITY"
         )
 
-        # Platform API button
+        # Platform API button, hidden until PlaneToPBR Pro launches
+        if not pro_enabled():
+            return
+
         prefs = get_addon_preferences(context)
         pro_row = layout.row()
         pro_available = bool(
-            prefs and prefs.platform_logged_in and prefs.platform_access_token and not prefs.platform_login_in_progress
+            prefs
+            and prefs.platform_logged_in
+            and prefs.platform_access_token
+            and not prefs.platform_login_in_progress
         )
         pro_row.enabled = pro_available
         pro_row.operator(
             "object.import_plane_from_platform",
             text=(
                 "Generate PBR Pro (GPU)"
-                if pro_available else
-                "Generate PBR Pro (Browser Login In Progress)"
-                if prefs and prefs.platform_login_in_progress else
-                "Generate PBR Pro (Login in Preferences)"
+                if pro_available
+                else "Generate PBR Pro (Browser Login In Progress)"
+                if prefs and prefs.platform_login_in_progress
+                else "Generate PBR Pro (Login in Preferences)"
             ),
-            icon='WORLD'
+            icon="WORLD",
         )
+
 
 # ------------------------------------------------------------
 # Registration
 # ------------------------------------------------------------
 
+
 def register():
     """Register the PlaneToPBR panel."""
     bpy.utils.register_class(VIEW3D_PT_planetopbr_panel)
+
 
 def unregister():
     """Unregister the PlaneToPBR panel."""

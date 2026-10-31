@@ -1,18 +1,19 @@
 import os
 import time
-import zipfile
 import urllib.error
-import socket
 from datetime import datetime
+
 import bpy
-from .platform_client import PlatformAuthError, PlatformClient, PlatformClientError
+
 from .hf_client import (
-    _resolve_fn_index,
-    _upload_file,
+    _download_results,
     _join_queue,
     _poll_queue,
-    _download_results,
+    _resolve_fn_index,
+    _upload_file,
 )
+from .platform_client import PlatformAuthError, PlatformClient, PlatformClientError
+
 
 def import_plane_from_image(textures):
     """
@@ -34,7 +35,7 @@ def import_plane_from_image(textures):
     try:
         img = bpy.data.images.load(diffuse_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to load diffuse image: {e}")
+        raise RuntimeError(f"Failed to load diffuse image: {e}") from e
 
     # Prevent divide-by-zero errors
     if img.size[1] == 0:
@@ -52,7 +53,7 @@ def import_plane_from_image(textures):
         bpy.ops.mesh.primitive_plane_add(size=2, enter_editmode=False, location=(0, 0, 0))
         plane = bpy.context.active_object
     except Exception as e:
-        raise RuntimeError(f"Failed to create plane: {e}")
+        raise RuntimeError(f"Failed to create plane: {e}") from e
 
     # Scale plane to match texture proportions
     plane.scale = (width / 2, height / 2, 1)
@@ -72,12 +73,13 @@ def import_plane_from_image(textures):
     try:
         plane.data.materials.append(mat)
     except Exception as e:
-        raise RuntimeError(f"Failed to assign material: {e}")
+        raise RuntimeError(f"Failed to assign material: {e}") from e
 
     # ------------------------------------------------------------
     # Add subdivision + displacement modifiers
     # ------------------------------------------------------------
     add_modifiers(plane, textures)
+
 
 def get_project_texture_dir():
     """
@@ -86,9 +88,7 @@ def get_project_texture_dir():
     """
 
     if not bpy.data.filepath:
-        raise RuntimeError(
-            "Please save the Blender project before generating textures."
-        )
+        raise RuntimeError("Please save the Blender project before generating textures.")
 
     project_dir = bpy.path.abspath("//")
     textures_dir = os.path.join(project_dir, "PlaneToPBR_textures")
@@ -159,14 +159,16 @@ def call_hf_pbr(image_path, output_dir, prompt=""):
         return _download_results(output, output_dir, timestamp, diffuse_path)
 
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}")
-    except socket.timeout:
-        raise RuntimeError("Request to Hugging Face Space timed out.")
+        raise RuntimeError(f"Network error contacting Hugging Face Space: {e}") from e
+    except TimeoutError as e:
+        raise RuntimeError("Request to Hugging Face Space timed out.") from e
     except Exception as e:
-        raise RuntimeError(f"PBR generation failed: {e}")
+        raise RuntimeError(f"PBR generation failed: {e}") from e
 
 
-def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_token=""):
+def call_platform_pbr(
+    image_path, output_dir, prompt, access_token, refresh_token="", auth_state=None
+):
     """
     Call the ScarlettStudios Platform API to generate PBR textures.
 
@@ -180,6 +182,7 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
         prompt: Text prompt for PBR generation
         access_token: Platform API access token
         refresh_token: Platform API refresh token
+        auth_state: Optional dictionary updated with the latest tokens, even on failure
 
     Returns:
         tuple[dict, dict]: Texture paths plus updated auth tokens
@@ -194,15 +197,23 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
     client.access_token = access_token or None
     client.refresh_token = refresh_token or None
 
+    try:
+        return _run_platform_pbr_job(client, image_path, output_dir, prompt)
+    finally:
+        if auth_state is not None:
+            auth_state.update(
+                access_token=client.access_token or "", refresh_token=client.refresh_token or ""
+            )
+
+
+def _run_platform_pbr_job(client, image_path, output_dir, prompt):
+    """Run the generation workflow using an existing client."""
     if not client.access_token:
         raise PlatformAuthError("No access token available. Login is required.")
 
     # Create PBR job
     job_response = client.create_pbr_job(
-        image_path=image_path,
-        prompt=prompt,
-        output_format="png",
-        return_mask=True
+        image_path=image_path, prompt=prompt, output_format="png", return_mask=True
     )
 
     job_id = job_response.get("job_id")
@@ -221,23 +232,29 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
             if not download_url:
                 raise PlatformClientError("Job completed but no download_url provided")
 
-            # Download results
+            # Download and extract results
             output_zip = os.path.join(output_dir, f"{job_id}.zip")
             client.download_results(download_url, output_zip)
 
-            # Extract textures
             extract_dir = os.path.join(output_dir, job_id)
-            os.makedirs(extract_dir, exist_ok=True)
-            with zipfile.ZipFile(output_zip, 'r') as zip_ref:
-                zip_ref.extractall(extract_dir)
+            extracted_files = client.extract_results(output_zip, extract_dir)
 
-            # Build texture dictionary (adjust based on actual file naming)
-            textures = {
-                "diffuse": os.path.join(extract_dir, "base_color.png"),
-                "normal": os.path.join(extract_dir, "normal.png"),
-                "roughness": os.path.join(extract_dir, "roughness.png"),
-                "metallic": os.path.join(extract_dir, "metallic.png"),
-            }
+            # Map extracted files to texture slots by filename keywords
+            textures = {}
+            for path in extracted_files:
+                name = os.path.basename(path).lower()
+                if any(k in name for k in ("albedo", "base_color", "diffuse", "color")):
+                    textures.setdefault("diffuse", path)
+                elif "normal" in name:
+                    textures.setdefault("normal", path)
+                elif "rough" in name:
+                    textures.setdefault("roughness", path)
+                elif "metal" in name:
+                    textures.setdefault("metallic", path)
+                elif "depth" in name or "height" in name:
+                    textures.setdefault("depth", path)
+                elif "mask" in name or "ao" in name:
+                    textures.setdefault("mask", path)
 
             auth_state = {
                 "access_token": client.access_token or "",
@@ -255,6 +272,7 @@ def call_platform_pbr(image_path, output_dir, prompt, access_token, refresh_toke
         attempt += 1
 
     raise PlatformClientError("Job polling timeout: max attempts reached")
+
 
 def apply_pbr_textures(plane, textures):
     """
@@ -278,6 +296,7 @@ def apply_pbr_textures(plane, textures):
 
     return mat
 
+
 def add_modifiers(plane, textures):
     """
     Add subdivision and displacement modifiers to the plane.
@@ -285,45 +304,46 @@ def add_modifiers(plane, textures):
     """
     try:
         # High-level subdivision for displacement detail
-        bpy.ops.object.modifier_add(type='SUBSURF')
+        bpy.ops.object.modifier_add(type="SUBSURF")
         sub1 = plane.modifiers["Subdivision"]
-        sub1.subdivision_type = 'SIMPLE'
+        sub1.subdivision_type = "SIMPLE"
         sub1.levels = 6
         sub1.render_levels = 6
 
         # Secondary subdivision layer
-        bpy.ops.object.modifier_add(type='SUBSURF')
+        bpy.ops.object.modifier_add(type="SUBSURF")
         sub2 = plane.modifiers["Subdivision.001"]
-        sub2.subdivision_type = 'SIMPLE'
+        sub2.subdivision_type = "SIMPLE"
         sub2.levels = 1
         sub2.render_levels = 1
 
         # Displacement modifier
-        bpy.ops.object.modifier_add(type='DISPLACE')
+        bpy.ops.object.modifier_add(type="DISPLACE")
         disp = plane.modifiers["Displace"]
 
     except Exception as e:
-        raise RuntimeError(f"Failed to add modifiers: {e}")
+        raise RuntimeError(f"Failed to add modifiers: {e}") from e
 
     # Apply depth map as displacement texture
     if textures.get("depth"):
         try:
-            displacement_texture = bpy.data.textures.new(
-                name="DisplacementTexture", type='IMAGE'
-            )
+            displacement_texture = bpy.data.textures.new(name="DisplacementTexture", type="IMAGE")
             displacement_texture.image = bpy.data.images.load(textures["depth"])
-            displacement_texture.image.colorspace_settings.name = 'Non-Color'
+            displacement_texture.image.colorspace_settings.name = "Non-Color"
             disp.texture = displacement_texture
         except Exception as e:
-            raise RuntimeError(f"Failed to load depth texture: {e}")
+            raise RuntimeError(f"Failed to load depth texture: {e}") from e
 
     # Configure displacement settings
-    disp.texture_coords = 'UV'
+    disp.texture_coords = "UV"
     disp.strength = 1.0
     disp.mid_level = 0.5
+
+
 # ------------------------------------------------------------
 # Base Material Setup
 # ------------------------------------------------------------
+
 
 def _create_base_material():
     """
@@ -334,7 +354,7 @@ def _create_base_material():
         mat = bpy.data.materials.new(name="PBR_Material")
         mat.use_nodes = True
     except Exception as e:
-        raise RuntimeError(f"Failed to create base material: {e}")
+        raise RuntimeError(f"Failed to create base material: {e}") from e
 
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
@@ -365,6 +385,7 @@ def _create_base_material():
 # Diffuse
 # ------------------------------------------------------------
 
+
 def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
     """
     Connect diffuse texture to Principled Base Color.
@@ -373,7 +394,7 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
         diffuse_node = nodes.new(type="ShaderNodeTexImage")
         diffuse_node.image = bpy.data.images.load(diffuse_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to load diffuse texture node: {e}")
+        raise RuntimeError(f"Failed to load diffuse texture node: {e}") from e
 
     diffuse_node.location = (-400, 300)
 
@@ -385,6 +406,7 @@ def _add_diffuse(nodes, links, bsdf, mapping, diffuse_path):
 # Roughness + Mask Blend
 # ------------------------------------------------------------
 
+
 def _add_roughness(nodes, links, bsdf, mapping, textures):
     """
     Blend roughness map with mask to control surface reflectivity.
@@ -394,7 +416,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     try:
         roughness_node.image = bpy.data.images.load(textures["roughness"])
     except Exception as e:
-        raise RuntimeError(f"Failed to load roughness map: {e}")
+        raise RuntimeError(f"Failed to load roughness map: {e}") from e
     roughness_node.image.colorspace_settings.name = "Non-Color"
     roughness_node.location = (-400, 100)
 
@@ -402,7 +424,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
     try:
         mask_node.image = bpy.data.images.load(textures["mask"])
     except Exception as e:
-        raise RuntimeError(f"Failed to load mask map: {e}")
+        raise RuntimeError(f"Failed to load mask map: {e}") from e
     mask_node.image.colorspace_settings.name = "Non-Color"
     mask_node.location = (-400, -100)
 
@@ -426,6 +448,7 @@ def _add_roughness(nodes, links, bsdf, mapping, textures):
 # Normal
 # ------------------------------------------------------------
 
+
 def _add_normal(nodes, links, bsdf, mapping, normal_path):
     """
     Add normal map to Principled BSDF Normal input.
@@ -434,7 +457,7 @@ def _add_normal(nodes, links, bsdf, mapping, normal_path):
     try:
         normal_node.image = bpy.data.images.load(normal_path)
     except Exception as e:
-        raise RuntimeError(f"Failed to load normal map: {e}")
+        raise RuntimeError(f"Failed to load normal map: {e}") from e
     normal_node.image.colorspace_settings.name = "Non-Color"
     normal_node.location = (-400, -300)
 

@@ -1,9 +1,8 @@
-import urllib.error
-import urllib.request
 import json
 import os
+import urllib.error
+import urllib.request
 import uuid
-import socket
 
 # ------------------------------------------------------------
 # Configuration
@@ -13,7 +12,7 @@ import socket
 REQUEST_TIMEOUT = 120
 
 # Base URL for your Hugging Face Space
-SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
+SPACE_BASE = "https://scarlettstudios-facademaker-inference.hf.space"
 
 # ------------------------------------------------------------
 # Public API (low-level helpers exported for use in utils.py)
@@ -24,26 +23,24 @@ SPACE_BASE = "https://ascarlettvfx-testpbr2026.hf.space"
 # Gradio Function Resolution
 # ------------------------------------------------------------
 
+
 def _resolve_fn_index(api_name="predict"):
     """
     Fetch Space config and determine which fn_index
     corresponds to the provided api_name.
     """
     try:
-        with urllib.request.urlopen(
-                f"{SPACE_BASE}/config",
-                timeout=REQUEST_TIMEOUT
-        ) as resp:
+        with urllib.request.urlopen(f"{SPACE_BASE}/config", timeout=REQUEST_TIMEOUT) as resp:
             config = json.loads(resp.read().decode())
 
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"HTTP error fetching Space config: {e.code} {e.reason}")
+        raise RuntimeError(f"HTTP error fetching Space config: {e.code} {e.reason}") from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Connection error fetching Space config: {e.reason}")
-    except json.JSONDecodeError:
-        raise RuntimeError("Invalid JSON received from Space config.")
-    except socket.timeout:
-        raise RuntimeError("Timeout fetching Space config.")
+        raise RuntimeError(f"Connection error fetching Space config: {e.reason}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError("Invalid JSON received from Space config.") from e
+    except TimeoutError as e:
+        raise RuntimeError("Timeout fetching Space config.") from e
 
     dependencies = config.get("dependencies")
     if not dependencies:
@@ -55,9 +52,11 @@ def _resolve_fn_index(api_name="predict"):
 
     raise RuntimeError(f"api_name '{api_name}' not found in Space config.")
 
+
 # ------------------------------------------------------------
 # File Upload
 # ------------------------------------------------------------
+
 
 def _upload_file(image_path, raw_bytes):
     """
@@ -68,10 +67,14 @@ def _upload_file(image_path, raw_bytes):
     filename = os.path.basename(image_path)
 
     body = (
-               f"--{boundary}\r\n"
-               f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'
-               f"Content-Type: image/png\r\n\r\n"
-           ).encode("utf-8") + raw_bytes + f"\r\n--{boundary}--\r\n".encode("utf-8")
+        (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="files"; filename="{filename}"\r\n'
+            f"Content-Type: image/png\r\n\r\n"
+        ).encode()
+        + raw_bytes
+        + f"\r\n--{boundary}--\r\n".encode()
+    )
 
     upload_req = urllib.request.Request(
         f"{SPACE_BASE}/gradio_api/upload",
@@ -84,13 +87,13 @@ def _upload_file(image_path, raw_bytes):
         with urllib.request.urlopen(upload_req, timeout=REQUEST_TIMEOUT) as resp:
             upload_data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Upload HTTP error: {e.code} {e.reason}")
+        raise RuntimeError(f"Upload HTTP error: {e.code} {e.reason}") from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Upload connection error: {e.reason}")
-    except json.JSONDecodeError:
-        raise RuntimeError("Invalid JSON returned during upload.")
-    except socket.timeout:
-        raise RuntimeError("Upload request timed out.")
+        raise RuntimeError(f"Upload connection error: {e.reason}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError("Invalid JSON returned during upload.") from e
+    except TimeoutError as e:
+        raise RuntimeError("Upload request timed out.") from e
 
     if not upload_data:
         raise RuntimeError("Upload returned empty response.")
@@ -102,6 +105,7 @@ def _upload_file(image_path, raw_bytes):
 # Queue Join
 # ------------------------------------------------------------
 
+
 def _join_queue(payload):
     """
     Submit payload to Gradio queue and return event_id.
@@ -110,20 +114,20 @@ def _join_queue(payload):
         f"{SPACE_BASE}/gradio_api/queue/join",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json"},
-        method="POST"
+        method="POST",
     )
 
     try:
         with urllib.request.urlopen(join_req, timeout=REQUEST_TIMEOUT) as resp:
             join_data = json.loads(resp.read().decode())
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Queue join HTTP error: {e.code} {e.reason}")
+        raise RuntimeError(f"Queue join HTTP error: {e.code} {e.reason}") from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Queue join connection error: {e.reason}")
-    except json.JSONDecodeError:
-        raise RuntimeError("Invalid JSON returned from queue join.")
-    except socket.timeout:
-        raise RuntimeError("Queue join timed out.")
+        raise RuntimeError(f"Queue join connection error: {e.reason}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError("Invalid JSON returned from queue join.") from e
+    except TimeoutError as e:
+        raise RuntimeError("Queue join timed out.") from e
 
     event_id = join_data.get("event_id")
     if not event_id:
@@ -135,6 +139,7 @@ def _join_queue(payload):
 # ------------------------------------------------------------
 # Queue Polling (SSE Stream)
 # ------------------------------------------------------------
+
 
 def _poll_queue(session_hash):
     """
@@ -173,17 +178,19 @@ def _poll_queue(session_hash):
                     raise RuntimeError(f"Space failed: {event}")
 
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Queue polling connection error: {e.reason}")
-    except socket.timeout:
-        raise RuntimeError("Queue polling timed out.")
-    except json.JSONDecodeError:
-        raise RuntimeError("Invalid JSON received while polling queue.")
+        raise RuntimeError(f"Queue polling connection error: {e.reason}") from e
+    except TimeoutError as e:
+        raise RuntimeError("Queue polling timed out.") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError("Invalid JSON received while polling queue.") from e
 
     raise RuntimeError("No output received from Space.")
+
 
 # ------------------------------------------------------------
 # Download Generated Results
 # ------------------------------------------------------------
+
 
 def _download_results(output, textures_dir, timestamp, diffuse_path):
     """
@@ -196,11 +203,15 @@ def _download_results(output, textures_dir, timestamp, diffuse_path):
 
     try:
         depth = _download_file(output[0]["url"], os.path.join(output_dir, f"depth_{timestamp}.png"))
-        normal = _download_file(output[1]["url"], os.path.join(output_dir, f"normal_{timestamp}.png"))
-        roughness = _download_file(output[2]["url"], os.path.join(output_dir, f"roughness_{timestamp}.png"))
+        normal = _download_file(
+            output[1]["url"], os.path.join(output_dir, f"normal_{timestamp}.png")
+        )
+        roughness = _download_file(
+            output[2]["url"], os.path.join(output_dir, f"roughness_{timestamp}.png")
+        )
         mask = _download_file(output[3]["url"], os.path.join(output_dir, f"mask_{timestamp}.png"))
     except KeyError as e:
-        raise RuntimeError(f"Missing expected output field: {e}")
+        raise RuntimeError(f"Missing expected output field: {e}") from e
 
     textures = {
         "diffuse": diffuse_path,
@@ -217,6 +228,7 @@ def _download_results(output, textures_dir, timestamp, diffuse_path):
 # File Downloader Helper
 # ------------------------------------------------------------
 
+
 def _download_file(url, path):
     """
     Download file from URL and write to disk.
@@ -226,16 +238,16 @@ def _download_file(url, path):
         with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT) as resp:
             data = resp.read()
     except urllib.error.HTTPError as e:
-        raise RuntimeError(f"Download HTTP error: {e.code} {e.reason}")
+        raise RuntimeError(f"Download HTTP error: {e.code} {e.reason}") from e
     except urllib.error.URLError as e:
-        raise RuntimeError(f"Download connection error: {e.reason}")
-    except socket.timeout:
-        raise RuntimeError("Download timed out.")
+        raise RuntimeError(f"Download connection error: {e.reason}") from e
+    except TimeoutError as e:
+        raise RuntimeError("Download timed out.") from e
 
     try:
         with open(path, "wb") as f:
             f.write(data)
     except OSError as e:
-        raise RuntimeError(f"Failed to write file {path}: {e}")
+        raise RuntimeError(f"Failed to write file {path}: {e}") from e
 
     return path

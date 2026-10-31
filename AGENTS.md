@@ -57,7 +57,8 @@ buildah build --file Containerfile --target checks .
 
 Pin `PYTHON_IMAGE`, `UV_IMAGE`, and CI's `BUILDAH_IMAGE` by digest, and keep
 the Python image's minor version equal to the oldest supported Blender's.
-Keep `UV_IMAGE` at the uv version used to write `uv.lock`.
+Keep `UV_IMAGE` at the uv version in `[tool.uv] required-version`; uv
+refuses to run at any other version, so update both together.
 
 ## Change conventions
 

@@ -21,6 +21,9 @@ dev = [
 [tool.uv]
 # Not an installable package; uv only manages the dev environment.
 package = false
+# Match UV_IMAGE in the Containerfile, so the lock is written and read by the
+# same uv.
+required-version = "==0.13.6"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
